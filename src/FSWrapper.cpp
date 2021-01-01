@@ -1,0 +1,779 @@
+#include "FSWrapper.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <cstring>
+#include <mutex>
+#include <coreinit/cache.h>
+#include <coreinit/debug.h>
+#include "utils/logger.h"
+#include "FileUtils.h"
+#include "globals.h"
+
+dirMagic_t dir_handles[DIR_HANDLES_LENGTH];
+fileMagic_t file_handles[FILE_HANDLES_LENGTH];
+
+std::mutex dir_handle_mutex;
+std::mutex file_handle_mutex;
+
+inline void getFullPath(char *pathForCheck, int pathSize, char *path) {
+    if (path[0] != '/' && path[0] != '\\') {
+        snprintf(pathForCheck, pathSize, "%s%s", gWorkingDir, path);
+        DEBUG_FUNCTION_LINE_VERBOSE("Real path is %s", path);
+    } else {
+        strncpy(pathForCheck, path, pathSize - 1);
+    }
+}
+
+inline bool checkForSave(char *pathForCheck, int pathSize, char *path) {
+    if (strncmp(path, "/vol/save", 9) == 0) {
+        int copyLen = strlen(path);
+        char copy[copyLen+1];
+        memcpy(copy, path, copyLen);
+        copy[copyLen] = 0;
+        memset(pathForCheck,0, pathSize);
+        snprintf(pathForCheck, pathSize, "%s%s", gSavePath, &copy[9]);
+        return true;
+    }
+    return false;
+}
+
+int getNewFileHandleIndex() {
+    file_handle_mutex.lock();
+    int32_t handle_id = -1;
+    for (int i = 0; i < FILE_HANDLES_LENGTH; i++) {
+        if (!file_handles[i].in_use) {
+            handle_id = i;
+            if (!file_handles[i].mutex) {
+                file_handles[i].mutex = (OSMutex *) malloc(sizeof(OSMutex));
+                OSInitMutex(file_handles[i].mutex);
+                if (!file_handles[i].mutex) {
+                    OSFatal("Failed to alloc memory for mutex");
+                }
+                DCFlushRange(file_handles[i].mutex, sizeof(OSMutex));
+                DCFlushRange(&file_handles[i], sizeof(fileMagic_t));
+            }
+            break;
+        }
+    }
+    file_handle_mutex.unlock();
+    return handle_id;
+}
+
+bool isValidDirHandle(int32_t handle) {
+    return (handle & HANDLE_INDICATOR_MASK) == DIR_HANDLE_MAGIC;
+}
+
+bool isValidFileHandle(int32_t handle) {
+    return (handle & HANDLE_INDICATOR_MASK) == FILE_HANDLE_MAGIC;
+}
+
+int32_t getNewDirHandleIndex() {
+    dir_handle_mutex.lock();
+    int32_t handle_id;
+    for (int i = 0; i < DIR_HANDLES_LENGTH; i++) {
+        if (!dir_handles[i].in_use) {
+            handle_id = i;
+            if (!dir_handles[i].mutex) {
+                dir_handles[i].mutex = (OSMutex *) malloc(sizeof(OSMutex));
+                OSInitMutex(dir_handles[i].mutex);
+                if (!dir_handles[i].mutex) {
+                    OSFatal("Failed to alloc memory for mutex");
+                }
+                DCFlushRange(dir_handles[i].mutex, sizeof(OSMutex));
+                DCFlushRange(&dir_handles[i], sizeof(dirMagic_t));
+            }
+            break;
+        }
+    }
+    dir_handle_mutex.unlock();
+    return handle_id;
+}
+
+void freeFileHandle(uint32_t handle) {
+    if (handle >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return;
+    }
+    file_handle_mutex.lock();
+    file_handles[handle].in_use = false;
+    if (file_handles[handle].mutex) {
+        free(file_handles[handle].mutex);
+        file_handles[handle].mutex = nullptr;
+    }
+    DCFlushRange(&file_handles[handle], sizeof(fileMagic_t));
+    file_handle_mutex.unlock();
+}
+
+void freeDirHandle(uint32_t handle) {
+    if (handle >= DIR_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return;
+    }
+    dir_handle_mutex.lock();
+    dir_handles[handle].in_use = false;
+    if (dir_handles[handle].mutex) {
+        free(dir_handles[handle].mutex);
+        dir_handles[handle].mutex = nullptr;
+    }
+    memset(&dir_handles[handle], 0, sizeof(dirMagic_t));
+    DCFlushRange(&dir_handles[handle], sizeof(dirMagic_t));
+    dir_handle_mutex.unlock();
+}
+
+FSStatus FSOpenDirWrapper(char *path,
+                          FSDirectoryHandle *handle,
+                          FSErrorFlag errorMask,
+                          std::function<FSStatus(char *_path)> fallback_function,
+                          std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    char pathForCheck[256];
+
+    getFullPath(pathForCheck, sizeof(pathForCheck), path);
+
+    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+        DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
+        return fallback_function(pathForCheck);
+    }
+    if (handle == nullptr) {
+        DEBUG_FUNCTION_LINE("Invalid args");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
+        memcpy(pathForCheck, "rom:", 4);
+
+        DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
+        FSStatus result = FS_STATUS_OK;
+
+        int handle_index = getNewDirHandleIndex();
+
+        if (handle_index >= 0) {
+            DIR *dir;
+            if ((dir = opendir(pathForCheck))) {
+                OSLockMutex(dir_handles[handle_index].mutex);
+                dir_handles[handle_index].handle = DIR_HANDLE_MAGIC | handle_index;
+                *handle = dir_handles[handle_index].handle;
+                dir_handles[handle_index].dir = dir;
+                dir_handles[handle_index].in_use = true;
+                strncpy(dir_handles[handle_index].path, pathForCheck, 255);
+                DCFlushRange(&dir_handles[handle_index], sizeof(dirMagic_t));
+                OSUnlockMutex(dir_handles[handle_index].mutex);
+            } else {
+                DEBUG_FUNCTION_LINE("Dir not found %s", pathForCheck);
+                if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
+                    result = FS_STATUS_NOT_FOUND;
+                }
+            }
+        } else {
+            if (errorMask & FS_ERROR_FLAG_MAX) {
+                result = FS_STATUS_MAX;
+            }
+        }
+        return result_handler(result);
+    }
+    return FS_STATUS_USE_REAL_OS;
+}
+
+FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
+                          FSDirectoryEntry *entry,
+                          FSErrorFlag errorMask,
+                          std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidDirHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    uint32_t handle_index = handle & HANDLE_MASK;
+    if (handle_index >= DIR_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return result_handler(FS_STATUS_FATAL_ERROR);
+    }
+
+    OSLockMutex(dir_handles[handle_index].mutex);
+    DIR *dir = dir_handles[handle_index].dir;
+
+    struct dirent *entry_ = readdir(dir);
+    FSStatus result = FS_STATUS_END;
+    if (entry_) {
+        strncpy(entry->name, entry_->d_name, 254);
+        entry->info.mode = (FSMode) FS_MODE_READ_OWNER;
+        if (entry_->d_type == DT_DIR) {
+            entry->info.flags = (FSStatFlags) ((uint32_t) FS_STAT_DIRECTORY);
+            entry->info.size = 0;
+        } else {
+            entry->info.flags = (FSStatFlags) 0;
+            if (strcmp(entry_->d_name, ".") == 0 || strcmp(entry_->d_name, "..") == 0) {
+                entry->info.size = 0;
+            } else {
+                struct stat sb{};
+                int strLen = strlen(dir_handles[handle_index].path) + 1 + strlen(entry_->d_name) + 1;
+                char path[strLen];
+                snprintf(path, sizeof(path), "%s/%s", dir_handles[handle_index].path, entry_->d_name);
+                if (stat(path, &sb) >= 0) {
+                    entry->info.size = sb.st_size;
+                    entry->info.flags = (FSStatFlags) 0;
+                    entry->info.owner = sb.st_uid;
+                    entry->info.group = sb.st_gid;
+                }
+            }
+        }
+        result = FS_STATUS_OK;
+    }
+
+    OSUnlockMutex(dir_handles[handle_index].mutex);
+    return result_handler(result);
+}
+
+FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
+                           FSErrorFlag errorMask,
+                           std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidDirHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+    if (handle_index >= DIR_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    OSLockMutex(dir_handles[handle_index].mutex);
+
+    DIR *dir = dir_handles[handle_index].dir;
+
+    FSStatus result = FS_STATUS_OK;
+    if (closedir(dir) != 0) {
+        result = FS_STATUS_MEDIA_ERROR;
+    }
+
+    OSUnlockMutex(dir_handles[handle_index].mutex);
+    freeDirHandle(handle_index);
+    return result_handler(result);
+}
+
+FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
+                            FSErrorFlag errorMask,
+                            std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidDirHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+    if (handle_index >= DIR_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+    uint32_t real_handle = handle & HANDLE_MASK;
+    OSLockMutex(dir_handles[handle_index].mutex);
+
+    DIR *dir = dir_handles[real_handle].dir;
+    rewinddir(dir);
+    OSUnlockMutex(dir_handles[handle_index].mutex);
+    return result_handler(FS_STATUS_OK);
+}
+
+FSStatus FSMakeDirWrapper(char *path,
+                          FSErrorFlag errorMask,
+                          std::function<FSStatus(char *_path)> fallback_function,
+                          std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    char pathForCheck[256];
+
+    getFullPath(pathForCheck, sizeof(pathForCheck), path);
+
+    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+        DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
+        return fallback_function(pathForCheck);
+    }
+
+    if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
+        FSStatus result = FS_STATUS_OK;
+        if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+            result = FS_STATUS_ACCESS_ERROR;
+        }
+        return result_handler(result);
+    }
+    return FS_STATUS_USE_REAL_OS;
+}
+
+FSStatus FSOpenFileWrapper(char *path,
+                           const char *mode,
+                           FSFileHandle *handle,
+                           FSErrorFlag errorMask,
+                           std::function<FSStatus(char *_path)> fallback_function,
+                           std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    if (path == nullptr) {
+        OSFATAL_FUNCTION_LINE("Invalid args");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    char pathForCheck[256];
+
+    getFullPath(pathForCheck, sizeof(pathForCheck), path);
+
+    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+        DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
+        return fallback_function(pathForCheck);
+    }
+    if (mode == nullptr || handle == nullptr) {
+        DEBUG_FUNCTION_LINE("Invalid args");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
+        memcpy(pathForCheck, "rom:", 4);
+        DEBUG_FUNCTION_LINE_VERBOSE("Trying to open %s", pathForCheck);
+        int handle_index = getNewFileHandleIndex();
+        FSStatus result = FS_STATUS_OK;
+        if (handle_index >= 0) {
+            OSLockMutex(file_handles[handle_index].mutex);
+            int _mode = 0;
+            // Map flags to open modes
+            if (strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
+                _mode = 0x000;
+            } else if (strcmp(mode, "r+") == 0) {
+                _mode = 0x002;
+            } else if (strcmp(mode, "w") == 0) {
+                _mode = 0x601;
+            } else if (strcmp(mode, "w+") == 0) {
+                _mode = 0x602;
+            } else if (strcmp(mode, "a") == 0) {
+                _mode = 0x209;
+            } else if (strcmp(mode, "a+") == 0) {
+                _mode = 0x20A;
+            } else {
+                //DEBUG_FUNCTION_LINE("%s", mode);
+                if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+                    result = FS_STATUS_ACCESS_ERROR;
+                }
+            }
+
+            int32_t fd = open(pathForCheck, _mode);
+            if (fd >= 0) {
+                DEBUG_FUNCTION_LINE_VERBOSE("opened file successfully %d", fd);
+
+                file_handles[handle_index].handle = FILE_HANDLE_MAGIC + handle_index;
+                //DEBUG_FUNCTION_LINE("handle %08X", file_handles[handle_index].handle);
+                *handle = file_handles[handle_index].handle;
+                file_handles[handle_index].fd = fd;
+                file_handles[handle_index].in_use = true;
+                DCFlushRange(&file_handles[handle_index], sizeof(fileMagic_t));
+            } else {
+                DEBUG_FUNCTION_LINE("File not found %s", pathForCheck);
+                if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
+                    result = FS_STATUS_NOT_FOUND;
+                }
+            }
+            OSUnlockMutex(file_handles[handle_index].mutex);
+        } else {
+            if (errorMask & FS_ERROR_FLAG_MAX) {
+                result = FS_STATUS_MAX;
+            }
+        }
+        return result_handler(result);
+    }
+    return FS_STATUS_USE_REAL_OS;
+}
+
+FSStatus FSCloseFileWrapper(FSFileHandle handle,
+                            FSErrorFlag errorMask,
+                            std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    OSLockMutex(file_handles[handle_index].mutex);
+
+    int real_fd = file_handles[handle_index].fd;
+    file_handles[handle_index].in_use = false;
+
+    DEBUG_FUNCTION_LINE_VERBOSE("closing %d", real_fd);
+
+    FSStatus result = FS_STATUS_OK;
+    if (close(real_fd) != 0) {
+        result = FS_STATUS_MEDIA_ERROR;
+    }
+    OSUnlockMutex(file_handles[handle_index].mutex);
+
+    freeFileHandle(handle_index);
+    return result_handler(result);
+}
+
+FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
+                          std::function<FSStatus(char *_path)> fallback_function,
+                          std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    if (path == nullptr) {
+        OSFATAL_FUNCTION_LINE("Invalid args");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    char pathForCheck[256];
+
+    getFullPath(pathForCheck, sizeof(pathForCheck), path);
+
+    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+        DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
+        return fallback_function(pathForCheck);
+    }
+    if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
+        memcpy(pathForCheck, "rom:", 4);
+        FSStatus result = FS_STATUS_OK;
+        if (stats == nullptr) {
+            DEBUG_FUNCTION_LINE("Invalid args");
+            return FS_STATUS_FATAL_ERROR;
+        } else {
+            struct stat path_stat{};
+            memset(&path_stat, 0, sizeof(path_stat));
+            if (stat(pathForCheck, &path_stat) < 0) {
+                DEBUG_FUNCTION_LINE("Path not found %s", pathForCheck);
+                if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
+                    result = FS_STATUS_NOT_FOUND;
+                }
+            } else {
+                memset(&(stats->flags), 0, sizeof(stats->flags));
+                if (S_ISDIR(path_stat.st_mode)) {
+                    stats->flags = (FSStatFlags) ((uint32_t) FS_STAT_DIRECTORY);
+                } else {
+                    stats->size = path_stat.st_size;
+                    stats->mode = (FSMode) FS_MODE_READ_OWNER;
+                    stats->flags = (FSStatFlags) 0;
+                    stats->owner = path_stat.st_uid;
+                    stats->group = path_stat.st_gid;
+                }
+                //DEBUG_FUNCTION_LINE("stats file for %s, size %016lLX", path, stats->size);
+            }
+        }
+        return result_handler(result);
+    }
+    return FS_STATUS_USE_REAL_OS;
+}
+
+FSStatus FSGetStatFileWrapper(FSFileHandle handle,
+                              FSStat *stats,
+                              FSErrorFlag errorMask,
+                              std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    OSLockMutex(file_handles[handle_index].mutex);
+
+    int real_fd = file_handles[handle_index].fd;
+    //DEBUG_FUNCTION_LINE("FSGetStatFileAsync real_fd %d", real_fd);
+
+    struct stat path_stat{};
+
+    FSStatus result = FS_STATUS_OK;
+    if (fstat(real_fd, &path_stat) < 0) {
+        result = FS_STATUS_MEDIA_ERROR;
+    } else {
+        memset(&(stats->flags), 0, sizeof(stats->flags));
+
+        stats->size = path_stat.st_size;
+        stats->mode = (FSMode) FS_MODE_READ_OWNER;
+        stats->flags = (FSStatFlags) 0;
+        stats->owner = path_stat.st_uid;
+        stats->group = path_stat.st_gid;
+    }
+
+    OSUnlockMutex(file_handles[handle_index].mutex);
+    return result_handler(result);
+}
+
+FSStatus FSReadFileWrapper(void *buffer,
+                           uint32_t size,
+                           uint32_t count,
+                           FSFileHandle handle,
+                           uint32_t unk1,
+                           FSErrorFlag errorMask,
+                           std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    if (size * count == 0) {
+        return result_handler(FS_STATUS_OK);
+    }
+    if (buffer == nullptr && (size * count != 0)) {
+        DEBUG_FUNCTION_LINE("Fatal read FSErrorFlag errorMask, buffer is null but size*count is not");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    FSStatus result;
+
+    OSLockMutex(file_handles[handle_index].mutex);
+
+    int real_fd = file_handles[handle_index].fd;
+
+    int32_t read = readIntoBuffer(real_fd, buffer, size, count);
+
+    if (read < 0) {
+        DEBUG_FUNCTION_LINE("Failed to read from handle");
+        result = FS_STATUS_MEDIA_ERROR;
+    } else {
+        result = (FSStatus) (read / size);
+    }
+
+    OSUnlockMutex(file_handles[handle_index].mutex);
+    return result_handler(result);
+}
+
+FSStatus FSReadFileWithPosWrapper(void *buffer,
+                                  uint32_t size,
+                                  uint32_t count,
+                                  uint32_t pos,
+                                  FSFileHandle handle,
+                                  int32_t unk1,
+                                  FSErrorFlag errorMask,
+                                  std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    FSStatus result;
+    if ((result = FSSetPosFileWrapper(handle, pos, errorMask,
+                                      [](FSStatus res) -> FSStatus { return res; })
+        ) != FS_STATUS_OK) {
+        return result;
+    }
+
+    result = FSReadFileWrapper(buffer, size, count, handle, unk1, errorMask,
+                               [](FSStatus res) -> FSStatus { return res; }
+    );
+    if (result != FS_STATUS_USE_REAL_OS && result != FS_STATUS_FATAL_ERROR) {
+        return result_handler(result);
+    }
+    return result;
+}
+
+FSStatus FSSetPosFileWrapper(FSFileHandle handle,
+                             uint32_t pos,
+                             FSErrorFlag errorMask,
+                             std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    FSStatus result = FS_STATUS_OK;
+    OSLockMutex(file_handles[handle_index].mutex);
+
+    int real_fd = file_handles[handle_index].fd;
+
+    if (lseek(real_fd, (off_t) pos, SEEK_SET) != pos) {
+        DEBUG_FUNCTION_LINE("Seek failed");
+        result = FS_STATUS_MEDIA_ERROR;
+    }
+    DEBUG_FUNCTION_LINE_VERBOSE("pos set to %d ", pos, real_fd);
+
+    OSUnlockMutex(file_handles[handle_index].mutex);
+    return result_handler(result);
+}
+
+FSStatus FSGetPosFileWrapper(FSFileHandle handle,
+                             uint32_t *pos,
+                             FSErrorFlag errorMask,
+                             std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    FSStatus result = FS_STATUS_OK;
+    OSLockMutex(file_handles[handle_index].mutex);
+
+    int real_fd = file_handles[handle_index].fd;
+
+    off_t currentPos = lseek(real_fd, (off_t) 0, SEEK_CUR);
+    if (currentPos == -1) {
+        DEBUG_FUNCTION_LINE("Failed to get current pos");
+        result = FS_STATUS_MEDIA_ERROR;
+    } else {
+        *pos = currentPos;
+        DEBUG_FUNCTION_LINE_VERBOSE("result was %d for %d", *pos, real_fd);
+    }
+
+    OSUnlockMutex(file_handles[handle_index].mutex);
+    return result_handler(result);
+}
+
+FSStatus FSIsEofWrapper(FSFileHandle handle,
+                        FSErrorFlag errorMask,
+                        std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+
+    FSStatus result = FS_STATUS_OK;
+    OSLockMutex(file_handles[handle_index].mutex);
+
+    int real_fd = file_handles[handle_index].fd;
+
+    off_t currentPos = lseek(real_fd, (off_t) 0, SEEK_CUR);
+    off_t endPos = lseek(real_fd, (off_t) 0, SEEK_END);
+
+    if (currentPos == endPos) {
+        DEBUG_FUNCTION_LINE_VERBOSE("FSIsEof END for %d\n", real_fd);
+        result = FS_STATUS_END;
+    } else {
+        lseek(real_fd, currentPos, SEEK_CUR);
+        DEBUG_FUNCTION_LINE_VERBOSE("FSIsEof OK for %d\n", real_fd);
+        result = FS_STATUS_OK;
+    }
+
+    OSUnlockMutex(file_handles[handle_index].mutex);
+    return result_handler(result);
+}
+
+FSStatus FSTruncateFileWrapper(FSFileHandle handle,
+                               FSErrorFlag errorMask,
+                               std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    uint32_t handle_index = handle & HANDLE_MASK;
+
+    if (handle_index >= FILE_HANDLES_LENGTH) {
+        DEBUG_FUNCTION_LINE("Invalid handle");
+        return FS_STATUS_FATAL_ERROR;
+    }
+    FSStatus result = FS_STATUS_OK;
+    if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+        result = FS_STATUS_ACCESS_ERROR;
+    }
+    return result_handler(result);
+}
+
+FSStatus FSWriteFileWrapper(uint8_t *buffer,
+                            uint32_t size,
+                            uint32_t count,
+                            FSFileHandle handle,
+                            uint32_t unk1,
+                            FSErrorFlag errorMask,
+                            std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    FSStatus result = FS_STATUS_OK;
+    if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+        result = FS_STATUS_ACCESS_ERROR;
+    }
+    return result_handler(result);
+}
+
+FSStatus FSRemoveWrapper(char *path,
+                         FSErrorFlag errorMask,
+                         std::function<FSStatus(char *_path)> fallback_function,
+                         std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    if (path == nullptr) {
+        OSFATAL_FUNCTION_LINE("Invalid args");
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    char pathForCheck[256];
+
+    getFullPath(pathForCheck, sizeof(pathForCheck), path);
+
+    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+        DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
+        return fallback_function(pathForCheck);
+    }
+    FSStatus result = FS_STATUS_OK;
+    if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+        result = FS_STATUS_ACCESS_ERROR;
+    }
+    return result_handler(result);
+}
+
+FSStatus FSRenameWrapper(char *oldPath,
+                         char *newPath,
+                         FSErrorFlag errorMask,
+                         std::function<FSStatus(char *_oldPath, char *_newPath)> fallback_function,
+                         std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+
+    char pathForCheck1[256];
+    char pathForCheck2[256];
+
+    getFullPath(pathForCheck1, sizeof(pathForCheck1), oldPath);
+    getFullPath(pathForCheck2, sizeof(pathForCheck2), newPath);
+
+    if (checkForSave(pathForCheck1, sizeof(pathForCheck1), pathForCheck1)) {
+        if (checkForSave(pathForCheck2, sizeof(pathForCheck2), pathForCheck2)) {
+            DEBUG_FUNCTION_LINE("Redirect save to %s/%s", pathForCheck1, pathForCheck2);
+            return fallback_function(pathForCheck1, pathForCheck2);
+        }
+    }
+
+    FSStatus result = FS_STATUS_OK;
+
+    if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+        result = FS_STATUS_ACCESS_ERROR;
+    }
+
+    return result_handler(result);
+}
+
+FSStatus FSFlushFileWrapper(FSFileHandle handle, FSErrorFlag errorMask, std::function<FSStatus(FSStatus)> result_handler) {
+    if (!gIsMounted || !isValidFileHandle(handle)) {
+        return FS_STATUS_USE_REAL_OS;
+    }
+    FSStatus result = FS_STATUS_OK;
+    if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
+        result = FS_STATUS_ACCESS_ERROR;
+    }
+
+    return result_handler(result);
+}

@@ -21,7 +21,9 @@ bool loadRPXFromSDOnNextLaunch(const std::string &path) {
 
     std::string completePath = "/vol/external01/" + path;
     int res = getRPXInfoForPath(completePath, &info);
+    bool isBundle = false;
     if (res >= 0) {
+        isBundle = true;
         request.filesize = ((uint32_t * ) & info.length)[1];
         request.fileoffset = ((uint32_t * ) & info.offset)[1];
     } else {
@@ -41,9 +43,20 @@ bool loadRPXFromSDOnNextLaunch(const std::string &path) {
         IOS_Close(mcpFd);
     }
 
-    gTryToReplaceOnNextLaunch = true;
-    memset(gLoadedBundlePath,0, sizeof(gLoadedBundlePath));
-    strncpy(gLoadedBundlePath, completePath.c_str(), completePath.length());
+    if(isBundle){
+        gTryToReplaceOnNextLaunch = true;
+        memset(gLoadedBundlePath,0, sizeof(gLoadedBundlePath));
+        strncpy(gLoadedBundlePath, completePath.c_str(), completePath.length());
+    }else {
+        if (!gIsMounted) {
+            gTryToReplaceOnNextLaunch = false;
+            memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));
+        } else {
+            // keep the old /vol/content mounted, this way you can reload just the rpx via wiiload
+            gTryToReplaceOnNextLaunch = true;
+        }
+    }
+
     return true;
 }
 

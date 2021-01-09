@@ -347,6 +347,11 @@ DECL_FUNCTION(FSStatus, FSGetFreeSpaceSizeAsync, FSClient *client, FSCmdBlock *b
 DECL_FUNCTION(FSStatus, FSChangeDirAsync, FSClient *client, FSCmdBlock *block, const char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE("FSChangeDirAsync %s", path);
     strncpy(gWorkingDir, path, sizeof(gWorkingDir));
+    int len = strlen(gWorkingDir);
+    if(len > 0 && gWorkingDir[len-1] != '/'){
+        gWorkingDir[len-1] = '/';
+        gWorkingDir[len] = 0;
+    }
     DCFlushRange(gWorkingDir, sizeof(gWorkingDir));
     return real_FSChangeDirAsync(client, block, path, errorMask, asyncData);
 }

@@ -171,7 +171,7 @@ int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info) {
     DIR *dir;
     struct dirent *entry;
 
-    if (!(dir = opendir("rcc:/"))) {
+    if (!(dir = opendir("rcc:/code/"))) {
         romfsUnmount("rcc");
         return -2;
     }
@@ -180,9 +180,11 @@ int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info) {
     while ((entry = readdir(dir)) != nullptr) {
         DEBUG_FUNCTION_LINE("%s", entry->d_name);
         if (StringTools::EndsWith(entry->d_name, ".rpx")) {
-            if (romfsGetFileInfoPerPath("rcc", entry->d_name, info) >= 0) {
+            if (romfsGetFileInfoPerPath("rcc", (std::string("code/") + entry->d_name).c_str(), info) >= 0) {
                 found = true;
                 res = 0;
+            }else{
+                DEBUG_FUNCTION_LINE("Failed to get info for %s", entry->d_name);
             }
             break;
         }

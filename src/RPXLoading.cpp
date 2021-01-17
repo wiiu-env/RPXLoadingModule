@@ -6,9 +6,99 @@
 #include "RPXLoading.h"
 #include "globals.h"
 #include "FileUtils.h"
+#include <nn/acp/title.h>
+#include <memory>
+#include <algorithm>
+#include "utils/FileReader.h"
+#include "utils/FileReaderCompressed.h"
+#include "utils/StringTools.h"
+#include "utils/ini.h"
+#include <cstring>
 
+char gIconCache[65580] __attribute__((section(".data")));
 
-bool loadRPXFromSDOnNextLaunch(const std::string &path) {
+/*
+ * Patch the meta xml for the home menu
+ */
+DECL_FUNCTION(int32_t, HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, uint32_t titleid_upper, uint32_t titleid_lower, ACPMetaXml *metaxml, uint32_t device) {
+    if (gReplacedRPX) {
+        memset(&metaxml->longname_ja, 0, 0x338C - 0x38C); // clear all names
+        strncpy(metaxml->longname_en, gBundleInfo.longname, 64);
+        strncpy(metaxml->shortname_en, gBundleInfo.shortname, 64);
+        strncpy(metaxml->publisher_en, gBundleInfo.author, 64);
+        metaxml->e_manual = 0;
+
+        return 0;
+    }
+    int result = real_HBM_NN_ACP_ACPGetTitleMetaXmlByDevice(titleid_upper, titleid_lower, metaxml, device);
+    return result;
+}
+
+DECL_FUNCTION(int, RPX_FSOpenFile, FSClient *client, FSCmdBlock *block, char *path, const char *mode, int *handle, int error) {
+    const char *iconTex = "iconTex.tga";
+    if (StringTools::EndsWith(path, iconTex)) {
+        if (gReplacedRPX) {
+            if (StringTools::EndsWith(path, iconTex)) {
+                auto *reader = new FileReader(reinterpret_cast<uint8_t *>(gIconCache), sizeof(gIconCache));
+                *handle = (uint32_t) reader;
+                return FS_STATUS_OK;
+            }
+        }
+    }
+    int result = real_RPX_FSOpenFile(client, block, path, mode, handle, error);
+    return result;
+}
+
+DECL_FUNCTION(FSStatus, RPX_FSReadFile, FSClient *client, FSCmdBlock *block, uint8_t *buffer, uint32_t size, uint32_t count, FSFileHandle handle, uint32_t unk1, uint32_t flags) {
+    // We check if the handle is part of our heap (the MemoryMapping Module allocates to 0x80000000)
+    if ((handle & 0xF0000000) == 0x80000000) {
+        auto reader = (FileReader *) handle;
+        return (FSStatus) reader->read(buffer, size * count);
+
+    }
+    FSStatus result = real_RPX_FSReadFile(client, block, buffer, size, count, handle, unk1, flags);
+    return result;
+}
+
+DECL_FUNCTION(FSStatus, RPX_FSCloseFile, FSClient *client, FSCmdBlock *block, FSFileHandle handle, uint32_t flags) {
+    // We check if the handle is part of our heap (the MemoryMapping Module allocates to 0x80000000)
+    if ((handle & 0xF0000000) == 0x80000000) {
+        auto reader = (FileReader *) handle;
+        delete reader;
+        return FS_STATUS_OK;
+    }
+
+    return real_RPX_FSCloseFile(client, block, handle, flags);
+}
+
+function_replacement_data_t rpx_utils_function_replacements[] = {
+        REPLACE_FUNCTION_VIA_ADDRESS_FOR_PROCESS(HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, 0x2E36CE44, 0x0E36CE44, FP_TARGET_PROCESS_HOME_MENU),
+        REPLACE_FUNCTION_FOR_PROCESS(RPX_FSOpenFile, LIBRARY_COREINIT, FSOpenFile, FP_TARGET_PROCESS_HOME_MENU),
+        REPLACE_FUNCTION_FOR_PROCESS(RPX_FSReadFile, LIBRARY_COREINIT, FSReadFile, FP_TARGET_PROCESS_HOME_MENU),
+        REPLACE_FUNCTION_FOR_PROCESS(RPX_FSCloseFile, LIBRARY_COREINIT, FSCloseFile, FP_TARGET_PROCESS_HOME_MENU),
+};
+
+uint32_t rpx_utils_function_replacements_size = sizeof(rpx_utils_function_replacements) / sizeof(function_replacement_data_t);
+
+static int parseINIhandler(void *user, const char *section, const char *name,
+                           const char *value) {
+    DEBUG_FUNCTION_LINE("%s %s %s", section, name, value);
+    auto *fInfo = (BundleInformation *) user;
+#define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
+    if (MATCH("menu", "longname")) {
+        strncpy(fInfo->longname, value, 64 - 1);
+    } else if (MATCH("menu", "shortname")) {
+        strncpy(fInfo->shortname, value, 64 - 1);
+    } else if (MATCH("menu", "author")) {
+        strncpy(fInfo->author, value, 64 - 1);
+    } else {
+        return 0;  /* unknown section/name, error */
+    }
+
+    return 1;
+}
+
+bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     LOAD_REQUEST request;
     memset(&request, 0, sizeof(request));
 
@@ -19,22 +109,66 @@ bool loadRPXFromSDOnNextLaunch(const std::string &path) {
 
     romfs_fileInfo info;
 
-    std::string completePath = "/vol/external01/" + path;
+    bool metaLoaded = false;
+
+    std::string completePath = std::string("/vol/external01/") + bundle_path;
     int res = getRPXInfoForPath(completePath, &info);
     bool isBundle = false;
     if (res >= 0) {
+        DEBUG_FUNCTION_LINE("Is bundle :)");
         isBundle = true;
-        request.filesize = ((uint32_t * ) & info.length)[1];
-        request.fileoffset = ((uint32_t * ) & info.offset)[1];
+        request.filesize = ((uint32_t *) &info.length)[1];
+        request.fileoffset = ((uint32_t *) &info.offset)[1];
+
+        if (romfsMount("rcc", completePath.c_str(), RomfsSource_FileDescriptor_CafeOS) == 0) {
+            if (ini_parse("rcc:/meta/meta.ini", parseINIhandler, &gBundleInfo) < 0) {
+                DEBUG_FUNCTION_LINE("Failed to load and parse meta.ini");
+            } else {
+                metaLoaded = true;
+            }
+            FileReader *reader = nullptr;
+
+            if (CheckFile("rcc:/meta/iconTex.tga")) {
+                std::string path = "rcc:/meta/iconTex.tga";
+                reader = new FileReader(path);
+            } else if (CheckFile("rcc:/meta/iconTex.tga.gz")) {
+                std::string path = "rcc:/meta/iconTex.tga.gz";
+                reader = new FileReaderCompressed(path);
+            }
+            if (reader) {
+                uint32_t alreadyRead = 0;
+                uint32_t toRead = sizeof(gIconCache);
+                do {
+                    int read = reader->read(reinterpret_cast<uint8_t *>(&gIconCache[alreadyRead]), toRead);
+                    if (read <= 0) {
+                        break;
+                    }
+                    alreadyRead += read;
+                    toRead -= read;
+                } while (alreadyRead < sizeof(gIconCache));
+                delete reader;
+            } else {
+                memset(gIconCache, 0, sizeof(gIconCache));
+            }
+            romfsUnmount("rcc");
+        }
     } else {
         DEBUG_FUNCTION_LINE("not a bundle %s %d", completePath.c_str(), res);
     }
 
-    strncpy(request.path, path.c_str(), 255);
+    if (!metaLoaded) {
+        strncpy(gBundleInfo.author, bundle_path, 64 - 1);
+        strncpy(gBundleInfo.shortname, bundle_path, 64 - 1);
+        strncpy(gBundleInfo.longname, bundle_path, 64 - 1);
+    }
+
+    strncpy(request.path, bundle_path, 255);
 
     DEBUG_FUNCTION_LINE("Loading file %s size: %08X offset: %08X", request.path, request.filesize, request.fileoffset);
 
+    DCFlushRange(gIconCache, sizeof(gIconCache));
     DCFlushRange(&request, sizeof(LOAD_REQUEST));
+    DCFlushRange(&gBundleInfo, sizeof(gBundleInfo));
 
     int mcpFd = IOS_Open("/dev/mcp", (IOSOpenMode) 0);
     if (mcpFd >= 0) {
@@ -43,11 +177,11 @@ bool loadRPXFromSDOnNextLaunch(const std::string &path) {
         IOS_Close(mcpFd);
     }
 
-    if(isBundle){
+    if (isBundle) {
         gTryToReplaceOnNextLaunch = true;
-        memset(gLoadedBundlePath,0, sizeof(gLoadedBundlePath));
+        memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));
         strncpy(gLoadedBundlePath, completePath.c_str(), completePath.length());
-    }else {
+    } else {
         if (!gIsMounted) {
             gTryToReplaceOnNextLaunch = false;
             memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));
@@ -60,4 +194,57 @@ bool loadRPXFromSDOnNextLaunch(const std::string &path) {
     return true;
 }
 
-WUMS_EXPORT_FUNCTION(loadRPXFromSDOnNextLaunch);
+int32_t RL_MountBundle(const char *name, const char *path, RomfsSource source) {
+    return romfsMount(name, path, source);
+}
+
+int32_t RL_UnmountBundle(const char *name) {
+    return romfsUnmount(name);
+}
+
+int32_t RL_FileOpen(const char *name, uint32_t *handle) {
+    if (handle == nullptr) {
+        return -1;
+    }
+
+    FileReader *reader = nullptr;
+    std::string path = std::string(name);
+    std::string pathGZ = path + ".gz";
+
+    if (CheckFile(path.c_str())) {
+        reader = new FileReader(path);
+    } else if (CheckFile(pathGZ.c_str())) {
+        reader = new FileReaderCompressed(pathGZ);
+    } else {
+        return -2;
+    }
+    if (reader == nullptr) {
+        return -3;
+    }
+    *handle = (uint32_t) reader;
+    return 0;
+}
+
+int32_t RL_FileRead(uint32_t handle, uint8_t *buffer, uint32_t size) {
+    auto reader = (FileReader *) handle;
+    return reader->read(buffer, size);
+}
+
+int32_t RL_FileClose(uint32_t handle) {
+    auto reader = (FileReader *) handle;
+    delete reader;
+    return 0;
+}
+
+int32_t RL_FileExists(const char *name) {
+    std::string checkgz = std::string(name) + ".gz";
+    return CheckFile(name) || CheckFile(checkgz.c_str());
+}
+
+WUMS_EXPORT_FUNCTION(RL_LoadFromSDOnNextLaunch);
+WUMS_EXPORT_FUNCTION(RL_MountBundle);
+WUMS_EXPORT_FUNCTION(RL_UnmountBundle);
+WUMS_EXPORT_FUNCTION(RL_FileOpen);
+WUMS_EXPORT_FUNCTION(RL_FileRead);
+WUMS_EXPORT_FUNCTION(RL_FileClose);
+WUMS_EXPORT_FUNCTION(RL_FileExists);

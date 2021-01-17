@@ -39,7 +39,7 @@ CXXFLAGS	:= $(CFLAGS) -std=c++17
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map) -T$(WUMS_ROOT)/share/libfunctionpatcher.ld $(WUMSSPECS) 
 
-LIBS	:= -lwums -lwut -lfunctionpatcher -lromfs
+LIBS	:= -lwums -lwut -lfunctionpatcher -lromfs -lz
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level

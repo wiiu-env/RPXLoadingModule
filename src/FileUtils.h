@@ -4,7 +4,6 @@
 #include <coreinit/filesystem.h>
 #include <romfs_dev.h>
 
-
 struct WUT_PACKED FSCmdBlockBody {//! FSAsyncResult object used for this command.
 
     WUT_UNKNOWN_BYTES(0x96C);
@@ -23,3 +22,5 @@ int32_t readIntoBuffer(int32_t handle, void *buffer, size_t size, size_t count);
 int32_t CreateSubfolder(const char *fullpath);
 
 int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info);
+
+int32_t CheckFile(const char * filepath);

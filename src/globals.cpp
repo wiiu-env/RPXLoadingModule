@@ -6,4 +6,6 @@ bool gTryToReplaceOnNextLaunch __attribute__((section(".data"))) = false;
 char gLoadedBundlePath[256] __attribute__((section(".data")));
 char gSavePath[256] __attribute__((section(".data")));
 char gWorkingDir[256] __attribute__((section(".data")));
-char gTempPath[256] __attribute__((section(".data")));
+
+bool gReplacedRPX  __attribute__((section(".data"))) = false;
+BundleInformation gBundleInfo  __attribute__((section(".data")));

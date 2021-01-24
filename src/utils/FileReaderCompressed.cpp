@@ -1,6 +1,6 @@
 #include "FileReaderCompressed.h"
 
-int FileReaderCompressed::read(uint8_t *buffer, int size) {
+int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
     int startValue = this->strm.total_out;
     uint32_t newSize = 0;
     int ret = 0;
@@ -10,10 +10,11 @@ int FileReaderCompressed::read(uint8_t *buffer, int size) {
             nextOut = size;
         }
         if (this->strm.avail_in == 0) {
-            this->strm.avail_in = FileReader::read(this->zlib_in_buf, BUFFER_SIZE);
-            if (this->strm.avail_in == 0 || this->strm.avail_in == -1) {
+            int read_res = FileReader::read(this->zlib_in_buf, BUFFER_SIZE);
+            if (read_res <= 0) {
                 break;
             }
+            this->strm.avail_in = read_res;
             this->strm.next_in = this->zlib_in_buf;
         }
         /* run inflate() on input until output buffer not full */
@@ -34,12 +35,15 @@ int FileReaderCompressed::read(uint8_t *buffer, int size) {
             switch (ret) {
                 case Z_NEED_DICT:
                     DEBUG_FUNCTION_LINE("Z_NEED_DICT");
-                    ret = Z_DATA_ERROR;     /* and fall through */
+                    ret = Z_DATA_ERROR;
+                    [[fallthrough]];    /* and fall through */
                 case Z_DATA_ERROR:
                 case Z_MEM_ERROR:
                     DEBUG_FUNCTION_LINE("Z_MEM_ERROR or Z_DATA_ERROR");
                     (void) inflateEnd(&this->strm);
                     return ret;
+                default:
+                    break;
             }
 
             newSize = this->strm.total_out - startValue;

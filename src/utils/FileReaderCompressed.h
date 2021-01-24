@@ -10,14 +10,13 @@ class FileReaderCompressed : public FileReader {
 public:
     FileReaderCompressed(uint8_t *buffer, uint32_t size);
 
-
     explicit FileReaderCompressed(std::string &file);
 
     ~FileReaderCompressed() override{
         DEBUG_FUNCTION_LINE("");
     }
 
-    int read(uint8_t *buffer, int size) override;
+    int read(uint8_t *buffer, uint32_t size) override;
 
 private:
     bool initDone = false;

@@ -1,9 +1,8 @@
 #include "FileReader.h"
 #include "logger.h"
-#include <string.h>
-#include <errno.h>
+#include <cstring>
 
-int FileReader::read(uint8_t *buffer, int size) {
+int FileReader::read(uint8_t *buffer, uint32_t size) {
     if (isReadFromBuffer) {
         if (input_buffer == nullptr) {
             return -1;

@@ -14,6 +14,7 @@
 #include "utils/StringTools.h"
 #include "utils/ini.h"
 #include <cstring>
+#include <rpxloader.h>
 
 char gIconCache[65580] __attribute__((section(".data")));
 
@@ -194,8 +195,8 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     return true;
 }
 
-int32_t RL_MountBundle(const char *name, const char *path, RomfsSource source) {
-    return romfsMount(name, path, source);
+int32_t RL_MountBundle(const char *name, const char *path, BundleSource source) {
+    return romfsMount(name, path, (RomfsSource) source);
 }
 
 int32_t RL_UnmountBundle(const char *name) {
@@ -236,7 +237,7 @@ int32_t RL_FileClose(uint32_t handle) {
     return 0;
 }
 
-int32_t RL_FileExists(const char *name) {
+bool RL_FileExists(const char *name) {
     std::string checkgz = std::string(name) + ".gz";
     return CheckFile(name) || CheckFile(checkgz.c_str());
 }

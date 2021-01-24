@@ -1,7 +1,7 @@
 #pragma once
 
 #include <function_patcher/function_patching.h>
-#include <stdint.h>
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {

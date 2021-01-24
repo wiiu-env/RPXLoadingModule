@@ -24,9 +24,11 @@ char gIconCache[65580] __attribute__((section(".data")));
 DECL_FUNCTION(int32_t, HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, uint32_t titleid_upper, uint32_t titleid_lower, ACPMetaXml *metaxml, uint32_t device) {
     if (gReplacedRPX) {
         memset(&metaxml->longname_ja, 0, 0x338C - 0x38C); // clear all names
-        strncpy(metaxml->longname_en, gBundleInfo.longname, 64);
-        strncpy(metaxml->shortname_en, gBundleInfo.shortname, 64);
-        strncpy(metaxml->publisher_en, gBundleInfo.author, 64);
+        strncpy(metaxml->longname_en, gBundleInfo.longname, sizeof(gBundleInfo.longname));
+        strncpy(metaxml->shortname_en, gBundleInfo.shortname, sizeof(gBundleInfo.longname));
+        strncpy(metaxml->publisher_en, gBundleInfo.author, sizeof(gBundleInfo.longname));
+
+        // Disbale the emanual
         metaxml->e_manual = 0;
 
         return 0;
@@ -83,7 +85,6 @@ uint32_t rpx_utils_function_replacements_size = sizeof(rpx_utils_function_replac
 
 static int parseINIhandler(void *user, const char *section, const char *name,
                            const char *value) {
-    DEBUG_FUNCTION_LINE("%s %s %s", section, name, value);
     auto *fInfo = (BundleInformation *) user;
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     if (MATCH("menu", "longname")) {
@@ -116,7 +117,6 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     int res = getRPXInfoForPath(completePath, &info);
     bool isBundle = false;
     if (res >= 0) {
-        DEBUG_FUNCTION_LINE("Is bundle :)");
         isBundle = true;
         request.filesize = ((uint32_t *) &info.length)[1];
         request.fileoffset = ((uint32_t *) &info.offset)[1];
@@ -153,8 +153,6 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
             }
             romfsUnmount("rcc");
         }
-    } else {
-        DEBUG_FUNCTION_LINE("not a bundle %s %d", completePath.c_str(), res);
     }
 
     if (!metaLoaded) {
@@ -165,7 +163,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
 
     strncpy(request.path, bundle_path, 255);
 
-    DEBUG_FUNCTION_LINE("Loading file %s size: %08X offset: %08X", request.path, request.filesize, request.fileoffset);
+    DEBUG_FUNCTION_LINE("Launch %s on next restart [size: %08X offset: %08X]", request.path, request.filesize, request.fileoffset);
 
     DCFlushRange(gIconCache, sizeof(gIconCache));
     DCFlushRange(&request, sizeof(LOAD_REQUEST));
@@ -179,10 +177,12 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     }
 
     if (isBundle) {
+        DEBUG_FUNCTION_LINE("Loaded file is a .wuhb bundle");
         gTryToReplaceOnNextLaunch = true;
         memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));
         strncpy(gLoadedBundlePath, completePath.c_str(), completePath.length());
     } else {
+        DEBUG_FUNCTION_LINE("Loaded file is no bundle");
         if (!gIsMounted) {
             gTryToReplaceOnNextLaunch = false;
             memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));

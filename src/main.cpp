@@ -19,7 +19,7 @@
 
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 
-WUMS_INITIALIZE(args) {
+WUMS_INITIALIZE() {
     WHBLogUdpInit();
     DEBUG_FUNCTION_LINE("Patch functions");
     // we only patch static functions, we don't need re-patch them and every launch
@@ -32,8 +32,8 @@ WUMS_INITIALIZE(args) {
 
 
 WUMS_APPLICATION_ENDS() {
-    DEBUG_FUNCTION_LINE("bye bye from rpx loader");
     if (gIsMounted) {
+        DEBUG_FUNCTION_LINE("Unmount /vol/content");
         romfsUnmount("rom");
         gIsMounted = false;
         DCFlushRange(&gIsMounted, sizeof(gIsMounted));
@@ -47,7 +47,7 @@ WUMS_APPLICATION_STARTS() {
     }
     WHBLogUdpInit();
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) != OSGetTitleID()) {
-        DEBUG_FUNCTION_LINE("gTryToReplaceOnNextLaunch, gReplacedRPX and gIsMounted to FALSE");
+        DEBUG_FUNCTION_LINE("Set gTryToReplaceOnNextLaunch, gReplacedRPX and gIsMounted to FALSE");
         gReplacedRPX = false;
         gTryToReplaceOnNextLaunch = false;
         gIsMounted = false;
@@ -74,10 +74,10 @@ WUMS_APPLICATION_STARTS() {
             CreateSubfolder(user.c_str());
             DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
             if (romfsMount("rom", gLoadedBundlePath, RomfsSource_FileDescriptor_CafeOS) == 0) {
-                DEBUG_FUNCTION_LINE("MOUNTED!");
+                DEBUG_FUNCTION_LINE("Mounted %s to /vol/content", gLoadedBundlePath);
                 gIsMounted = true;
             } else {
-                DEBUG_FUNCTION_LINE("MOUNTED FAILED %s", gLoadedBundlePath);
+                DEBUG_FUNCTION_LINE("Failed to mount %s", gLoadedBundlePath);
                 gIsMounted = false;
             }
             gReplacedRPX = true;

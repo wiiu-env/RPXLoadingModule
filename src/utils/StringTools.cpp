@@ -254,17 +254,17 @@ char *StringTools::str_replace(char *orig, char *rep, char *with) {
 
     // sanity checks and initialization
     if (!orig || !rep)
-        return NULL;
+        return nullptr;
     len_rep = strlen(rep);
     if (len_rep == 0)
-        return NULL; // empty rep causes infinite loop during count
+        return nullptr; // empty rep causes infinite loop during count
     if (!with)
         with = "";
     len_with = strlen(with);
 
     // count the number of replacements needed
     ins = orig;
-    for (count = 0; tmp = strstr(ins, rep); ++count) {
+    for (count = 0; (tmp = strstr(ins, rep)); ++count) {
         ins = tmp + len_rep;
     }
 

@@ -87,29 +87,32 @@ int32_t readIntoBuffer(int32_t handle, void *buffer, size_t size, size_t count) 
             //DEBUG_FUNCTION_LINE("Reading. missing %08X bytes\n", sizeToRead);
         }
     }
-    ////DEBUG_FUNCTION_LINE("Success: Read %08X bytes from handle %08X. result %08X \n", size * count, handle, totalSize);
+    //DEBUG_FUNCTION_LINE("Success: Read %08X bytes from handle %08X. result %08X \n", size * count, handle, totalSize);
     return totalSize;
 }
 
 int32_t CheckFile(const char * filepath) {
-    if(!filepath)
+    if (!filepath) {
         return 0;
+    }
 
     struct stat filestat{};
 
-    char dirnoslash[strlen(filepath)+2];
+    char dirnoslash[strlen(filepath) + 2];
     snprintf(dirnoslash, sizeof(dirnoslash), "%s", filepath);
 
-    while(dirnoslash[strlen(dirnoslash)-1] == '/')
-        dirnoslash[strlen(dirnoslash)-1] = '\0';
+    while (dirnoslash[strlen(dirnoslash) - 1] == '/') {
+        dirnoslash[strlen(dirnoslash) - 1] = '\0';
+    }
 
-    char * notRoot = strrchr(dirnoslash, '/');
-    if(!notRoot) {
+    char *notRoot = strrchr(dirnoslash, '/');
+    if (!notRoot) {
         strcat(dirnoslash, "/");
     }
 
-    if (stat(dirnoslash, &filestat) == 0)
+    if (stat(dirnoslash, &filestat) == 0) {
         return 1;
+    }
 
     return 0;
 }
@@ -140,8 +143,9 @@ int32_t CreateSubfolder(const char * fullpath) {
             //!Device root directory (must be with '/')
             strcat(parentpath, "/");
             struct stat filestat{};
-            if (stat(parentpath, &filestat) == 0)
+            if (stat(parentpath, &filestat) == 0){
                 return 1;
+            }
 
             return 0;
         }
@@ -178,7 +182,6 @@ int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info) {
     bool found = false;
     int res = -3;
     while ((entry = readdir(dir)) != nullptr) {
-        DEBUG_FUNCTION_LINE("%s", entry->d_name);
         if (StringTools::EndsWith(entry->d_name, ".rpx")) {
             if (romfsGetFileInfoPerPath("rcc", (std::string("code/") + entry->d_name).c_str(), info) >= 0) {
                 found = true;

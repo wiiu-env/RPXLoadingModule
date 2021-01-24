@@ -14,7 +14,7 @@ int FileReader::read(uint8_t *buffer, uint32_t size) {
         if (toRead == 0) {
             return 0;
         }
-        memcpy(buffer, input_buffer, toRead);
+        memcpy(buffer, input_buffer + input_pos, toRead);
         input_pos += toRead;
         return toRead;
     } else if (isReadFromFile) {
@@ -45,6 +45,6 @@ FileReader::FileReader(uint8_t *buffer, uint32_t size) {
     this->input_buffer = buffer;
     this->input_size = size;
     this->input_pos = 0;
-    this->isReadFromBuffer = false;
+    this->isReadFromBuffer = true;
     this->isReadFromFile = false;
 }

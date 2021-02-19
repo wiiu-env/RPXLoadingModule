@@ -16,17 +16,16 @@
 #include <cstring>
 #include <rpxloader.h>
 
-char gIconCache[65580] __attribute__((section(".data")));
 
 /*
  * Patch the meta xml for the home menu
  */
 DECL_FUNCTION(int32_t, HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, uint32_t titleid_upper, uint32_t titleid_lower, ACPMetaXml *metaxml, uint32_t device) {
-    if (gReplacedRPX) {
+    if (gReplacementInfo.isRPXReplaced) {
         memset(&metaxml->longname_ja, 0, 0x338C - 0x38C); // clear all names
-        strncpy(metaxml->longname_en, gBundleInfo.longname, sizeof(gBundleInfo.longname));
-        strncpy(metaxml->shortname_en, gBundleInfo.shortname, sizeof(gBundleInfo.longname));
-        strncpy(metaxml->publisher_en, gBundleInfo.author, sizeof(gBundleInfo.longname));
+        strncpy(metaxml->longname_en, gReplacementInfo.metaInformation.longname, sizeof(gReplacementInfo.metaInformation.longname));
+        strncpy(metaxml->shortname_en, gReplacementInfo.metaInformation.shortname, sizeof(gReplacementInfo.metaInformation.shortname));
+        strncpy(metaxml->publisher_en, gReplacementInfo.metaInformation.author, sizeof(gReplacementInfo.metaInformation.author));
 
         // Disbale the emanual
         metaxml->e_manual = 0;
@@ -40,9 +39,9 @@ DECL_FUNCTION(int32_t, HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, uint32_t titleid_u
 DECL_FUNCTION(int, RPX_FSOpenFile, FSClient *client, FSCmdBlock *block, char *path, const char *mode, int *handle, int error) {
     const char *iconTex = "iconTex.tga";
     if (StringTools::EndsWith(path, iconTex)) {
-        if (gReplacedRPX) {
+        if (gReplacementInfo.isRPXReplaced) {
             if (StringTools::EndsWith(path, iconTex)) {
-                auto *reader = new FileReader(reinterpret_cast<uint8_t *>(gIconCache), sizeof(gIconCache));
+                auto *reader = new FileReader(reinterpret_cast<uint8_t *>(gReplacementInfo.iconCache), sizeof(gReplacementInfo.iconCache));
                 *handle = (uint32_t) reader;
                 return FS_STATUS_OK;
             }
@@ -85,7 +84,7 @@ uint32_t rpx_utils_function_replacements_size = sizeof(rpx_utils_function_replac
 
 static int parseINIhandler(void *user, const char *section, const char *name,
                            const char *value) {
-    auto *fInfo = (BundleInformation *) user;
+    auto *fInfo = (MetaInformation *) user;
 #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
     if (MATCH("menu", "longname")) {
         strncpy(fInfo->longname, value, 64 - 1);
@@ -113,16 +112,19 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
 
     bool metaLoaded = false;
 
+    gReplacementInfo.replacementType = RPXLoader_RPX;
+
     std::string completePath = std::string("/vol/external01/") + bundle_path;
     int res = getRPXInfoForPath(completePath, &info);
     bool isBundle = false;
     if (res >= 0) {
+        gReplacementInfo.replacementType = RPXLoader_BUNDLE;
         isBundle = true;
         request.filesize = ((uint32_t *) &info.length)[1];
         request.fileoffset = ((uint32_t *) &info.offset)[1];
 
         if (romfsMount("rcc", completePath.c_str(), RomfsSource_FileDescriptor_CafeOS) == 0) {
-            if (ini_parse("rcc:/meta/meta.ini", parseINIhandler, &gBundleInfo) < 0) {
+            if (ini_parse("rcc:/meta/meta.ini", parseINIhandler, &gReplacementInfo.metaInformation) < 0) {
                 DEBUG_FUNCTION_LINE("Failed to load and parse meta.ini");
             } else {
                 metaLoaded = true;
@@ -138,59 +140,73 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
             }
             if (reader) {
                 uint32_t alreadyRead = 0;
-                uint32_t toRead = sizeof(gIconCache);
+                uint32_t toRead = sizeof(gReplacementInfo.iconCache);
                 do {
-                    int read = reader->read(reinterpret_cast<uint8_t *>(&gIconCache[alreadyRead]), toRead);
+                    int read = reader->read(reinterpret_cast<uint8_t *>(&gReplacementInfo.iconCache[alreadyRead]), toRead);
                     if (read <= 0) {
                         break;
                     }
                     alreadyRead += read;
                     toRead -= read;
-                } while (alreadyRead < sizeof(gIconCache));
+                } while (alreadyRead < sizeof(gReplacementInfo.iconCache));
                 delete reader;
             } else {
-                memset(gIconCache, 0, sizeof(gIconCache));
+                memset(gReplacementInfo.iconCache, 0, sizeof(gReplacementInfo.iconCache));
             }
             romfsUnmount("rcc");
         }
     }
 
     if (!metaLoaded) {
-        strncpy(gBundleInfo.author, bundle_path, 64 - 1);
-        strncpy(gBundleInfo.shortname, bundle_path, 64 - 1);
-        strncpy(gBundleInfo.longname, bundle_path, 64 - 1);
+        strncpy(gReplacementInfo.metaInformation.author, bundle_path, sizeof(gReplacementInfo.metaInformation.author));
+        strncpy(gReplacementInfo.metaInformation.shortname, bundle_path, sizeof(gReplacementInfo.metaInformation.shortname));
+        strncpy(gReplacementInfo.metaInformation.longname, bundle_path, sizeof(gReplacementInfo.metaInformation.longname));
     }
 
     strncpy(request.path, bundle_path, 255);
 
-    DEBUG_FUNCTION_LINE("Launch %s on next restart [size: %08X offset: %08X]", request.path, request.filesize, request.fileoffset);
-
-    DCFlushRange(gIconCache, sizeof(gIconCache));
     DCFlushRange(&request, sizeof(LOAD_REQUEST));
-    DCFlushRange(&gBundleInfo, sizeof(gBundleInfo));
 
+    int success = false;
     int mcpFd = IOS_Open("/dev/mcp", (IOSOpenMode) 0);
     if (mcpFd >= 0) {
         int out = 0;
         IOS_Ioctl(mcpFd, 100, &request, sizeof(request), &out, sizeof(out));
+        if (out > 0) {
+            success = true;
+        }
+
         IOS_Close(mcpFd);
     }
 
+    DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+
+    if (!success) {
+        gReplacementInfo.replacementType = RPXLoader_NONE;
+        DEBUG_FUNCTION_LINE("Failed to load %s on next restart", request.path);
+        return false;
+    }
+
+    DEBUG_FUNCTION_LINE("Launch %s on next restart [size: %08X offset: %08X]", request.path, request.filesize, request.fileoffset);
+
     if (isBundle) {
         DEBUG_FUNCTION_LINE("Loaded file is a .wuhb bundle");
-        gTryToReplaceOnNextLaunch = true;
-        memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));
-        strncpy(gLoadedBundlePath, completePath.c_str(), completePath.length());
+        memset(gReplacementInfo.bundleMountInformation.path, 0, sizeof(gReplacementInfo.bundleMountInformation.path));
+        strncpy(gReplacementInfo.bundleMountInformation.path, completePath.c_str(), completePath.length());
+        gReplacementInfo.replacementType = RPXLoader_BUNDLE;
+        gReplacementInfo.bundleMountInformation.redirectionRequested = true;
     } else {
         DEBUG_FUNCTION_LINE("Loaded file is no bundle");
-        if (!gIsMounted) {
-            gTryToReplaceOnNextLaunch = false;
-            memset(gLoadedBundlePath, 0, sizeof(gLoadedBundlePath));
+        if (!gReplacementInfo.bundleMountInformation.isMounted) {
+            memset(gReplacementInfo.bundleMountInformation.path, 0, sizeof(gReplacementInfo.bundleMountInformation.path));
         } else {
+            gReplacementInfo.replacementType = RPXLoader_BUNDLE_OTHER_RPX;
+            gReplacementInfo.bundleMountInformation.redirectionRequested = true;
             // keep the old /vol/content mounted, this way you can reload just the rpx via wiiload
-            gTryToReplaceOnNextLaunch = true;
         }
     }
+
+    DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
 
     return true;
 }

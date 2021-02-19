@@ -19,7 +19,7 @@ std::mutex file_handle_mutex;
 
 inline void getFullPath(char *pathForCheck, int pathSize, char *path) {
     if (path[0] != '/' && path[0] != '\\') {
-        snprintf(pathForCheck, pathSize, "%s%s", gWorkingDir, path);
+        snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.bundleMountInformation.workingDir, path);
         DEBUG_FUNCTION_LINE_VERBOSE("Real path is %s", path);
     } else {
         strncpy(pathForCheck, path, pathSize - 1);
@@ -33,7 +33,7 @@ inline bool checkForSave(char *pathForCheck, int pathSize, char *path) {
         memcpy(copy, path, copyLen);
         copy[copyLen] = 0;
         memset(pathForCheck,0, pathSize);
-        snprintf(pathForCheck, pathSize, "%s%s", gSavePath, &copy[9]);
+        snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.savePath, &copy[9]);
         return true;
     }
     return false;
@@ -127,7 +127,7 @@ FSStatus FSOpenDirWrapper(char *path,
                           FSErrorFlag errorMask,
                           std::function<FSStatus(char *_path)> fallback_function,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -183,7 +183,7 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
                           FSDirectoryEntry *entry,
                           FSErrorFlag errorMask,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidDirHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidDirHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -231,7 +231,7 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
 FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
                            FSErrorFlag errorMask,
                            std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidDirHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidDirHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -257,7 +257,7 @@ FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
 FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
                             FSErrorFlag errorMask,
                             std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidDirHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidDirHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -278,7 +278,7 @@ FSStatus FSMakeDirWrapper(char *path,
                           FSErrorFlag errorMask,
                           std::function<FSStatus(char *_path)> fallback_function,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -307,7 +307,7 @@ FSStatus FSOpenFileWrapper(char *path,
                            FSErrorFlag errorMask,
                            std::function<FSStatus(char *_path)> fallback_function,
                            std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted) {
         return FS_STATUS_USE_REAL_OS;
     }
     if (path == nullptr) {
@@ -386,7 +386,7 @@ FSStatus FSOpenFileWrapper(char *path,
 FSStatus FSCloseFileWrapper(FSFileHandle handle,
                             FSErrorFlag errorMask,
                             std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -417,7 +417,7 @@ FSStatus FSCloseFileWrapper(FSFileHandle handle,
 FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
                           std::function<FSStatus(char *_path)> fallback_function,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted) {
         return FS_STATUS_USE_REAL_OS;
     }
     if (path == nullptr) {
@@ -470,7 +470,7 @@ FSStatus FSGetStatFileWrapper(FSFileHandle handle,
                               FSStat *stats,
                               FSErrorFlag errorMask,
                               std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -511,7 +511,7 @@ FSStatus FSReadFileWrapper(void *buffer,
                            uint32_t unk1,
                            FSErrorFlag errorMask,
                            std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -556,7 +556,7 @@ FSStatus FSReadFileWithPosWrapper(void *buffer,
                                   int32_t unk1,
                                   FSErrorFlag errorMask,
                                   std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     FSStatus result;
@@ -579,7 +579,7 @@ FSStatus FSSetPosFileWrapper(FSFileHandle handle,
                              uint32_t pos,
                              FSErrorFlag errorMask,
                              std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -609,7 +609,7 @@ FSStatus FSGetPosFileWrapper(FSFileHandle handle,
                              uint32_t *pos,
                              FSErrorFlag errorMask,
                              std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -640,7 +640,7 @@ FSStatus FSGetPosFileWrapper(FSFileHandle handle,
 FSStatus FSIsEofWrapper(FSFileHandle handle,
                         FSErrorFlag errorMask,
                         std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -674,7 +674,7 @@ FSStatus FSIsEofWrapper(FSFileHandle handle,
 FSStatus FSTruncateFileWrapper(FSFileHandle handle,
                                FSErrorFlag errorMask,
                                std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -697,7 +697,7 @@ FSStatus FSWriteFileWrapper(uint8_t *buffer,
                             uint32_t unk1,
                             FSErrorFlag errorMask,
                             std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     FSStatus result = FS_STATUS_OK;
@@ -711,7 +711,7 @@ FSStatus FSRemoveWrapper(char *path,
                          FSErrorFlag errorMask,
                          std::function<FSStatus(char *_path)> fallback_function,
                          std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -740,7 +740,7 @@ FSStatus FSRenameWrapper(char *oldPath,
                          FSErrorFlag errorMask,
                          std::function<FSStatus(char *_oldPath, char *_newPath)> fallback_function,
                          std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -767,7 +767,7 @@ FSStatus FSRenameWrapper(char *oldPath,
 }
 
 FSStatus FSFlushFileWrapper(FSFileHandle handle, FSErrorFlag errorMask, std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gIsMounted || !isValidFileHandle(handle)) {
+    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     FSStatus result = FS_STATUS_OK;

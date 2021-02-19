@@ -346,13 +346,13 @@ DECL_FUNCTION(FSStatus, FSGetFreeSpaceSizeAsync, FSClient *client, FSCmdBlock *b
 
 DECL_FUNCTION(FSStatus, FSChangeDirAsync, FSClient *client, FSCmdBlock *block, const char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE("FSChangeDirAsync %s", path);
-    strncpy(gWorkingDir, path, sizeof(gWorkingDir));
-    int len = strlen(gWorkingDir);
-    if(len > 0 && gWorkingDir[len-1] != '/'){
-        gWorkingDir[len-1] = '/';
-        gWorkingDir[len] = 0;
+    strncpy(gReplacementInfo.bundleMountInformation.workingDir, path, sizeof(gReplacementInfo.bundleMountInformation.workingDir));
+    int len = strlen(gReplacementInfo.bundleMountInformation.workingDir);
+    if(len > 0 && gReplacementInfo.bundleMountInformation.workingDir[len-1] != '/'){
+        gReplacementInfo.bundleMountInformation.workingDir[len-1] = '/';
+        gReplacementInfo.bundleMountInformation.workingDir[len] = 0;
     }
-    DCFlushRange(gWorkingDir, sizeof(gWorkingDir));
+    DCFlushRange(gReplacementInfo.bundleMountInformation.workingDir, sizeof(gReplacementInfo.bundleMountInformation.workingDir));
     return real_FSChangeDirAsync(client, block, path, errorMask, asyncData);
 }
 

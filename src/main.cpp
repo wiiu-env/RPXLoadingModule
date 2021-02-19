@@ -27,16 +27,16 @@ WUMS_INITIALIZE() {
     FunctionPatcherPatchFunction(fs_dir_function_replacements, fs_dir_function_replacements_size);
     FunctionPatcherPatchFunction(rpx_utils_function_replacements, rpx_utils_function_replacements_size);
     DEBUG_FUNCTION_LINE("Patch functions finished");
-    gIsMounted = false;
+    gReplacementInfo = {};
 }
 
 
 WUMS_APPLICATION_ENDS() {
-    if (gIsMounted) {
+    if (gReplacementInfo.bundleMountInformation.isMounted) {
         DEBUG_FUNCTION_LINE("Unmount /vol/content");
         romfsUnmount("rom");
-        gIsMounted = false;
-        DCFlushRange(&gIsMounted, sizeof(gIsMounted));
+        gReplacementInfo.bundleMountInformation.isMounted = false;
+        DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
     }
 }
 
@@ -48,43 +48,45 @@ WUMS_APPLICATION_STARTS() {
     WHBLogUdpInit();
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) != OSGetTitleID()) {
         DEBUG_FUNCTION_LINE("Set gTryToReplaceOnNextLaunch, gReplacedRPX and gIsMounted to FALSE");
-        gReplacedRPX = false;
-        gTryToReplaceOnNextLaunch = false;
-        gIsMounted = false;
-        DCFlushRange(&gReplacedRPX, sizeof(gReplacedRPX));
-        DCFlushRange(&gTryToReplaceOnNextLaunch, sizeof(gTryToReplaceOnNextLaunch));
-        DCFlushRange(&gIsMounted, sizeof(gIsMounted));
+        gReplacementInfo.replacementType = RPXLoader_NONE;
+        gReplacementInfo.isRPXReplaced = false;
+        gReplacementInfo.bundleMountInformation.isMounted = false;
+        gReplacementInfo.bundleMountInformation.redirectionRequested = false;
+        DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
     } else {
-        if (gTryToReplaceOnNextLaunch) {
-            gCurrentHash = StringTools::hash(gLoadedBundlePath);
-
-            nn::act::Initialize();
-            nn::act::SlotNo slot = nn::act::GetSlotNo();
-            nn::act::Finalize();
-
-            std::string basePath = StringTools::strfmt("/vol/external01/wiiu/apps/save/%08X", gCurrentHash);
-            std::string common = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/common", gCurrentHash);
-            std::string user = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/%08X", gCurrentHash, 0x80000000 | slot);
-
-            strncpy(gSavePath,basePath.c_str(), 255);
-            memset(gWorkingDir, 0, sizeof(gWorkingDir));
-            DCFlushRange(gWorkingDir, sizeof(gWorkingDir));
-
-            CreateSubfolder(common.c_str());
-            CreateSubfolder(user.c_str());
-            DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
-            if (romfsMount("rom", gLoadedBundlePath, RomfsSource_FileDescriptor_CafeOS) == 0) {
-                DEBUG_FUNCTION_LINE("Mounted %s to /vol/content", gLoadedBundlePath);
-                gIsMounted = true;
-            } else {
-                DEBUG_FUNCTION_LINE("Failed to mount %s", gLoadedBundlePath);
-                gIsMounted = false;
-            }
-            gReplacedRPX = true;
-            DCFlushRange(&gReplacedRPX, sizeof(gReplacedRPX));
-            DCFlushRange(&gIsMounted, sizeof(gIsMounted));
-            DCFlushRange(&gTryToReplaceOnNextLaunch, sizeof(gTryToReplaceOnNextLaunch));
+        if (gReplacementInfo.replacementType != RPXLoader_NONE) {
+            gReplacementInfo.isRPXReplaced =  true;
         }
+        if (gReplacementInfo.bundleMountInformation.redirectionRequested) {
+            if (gReplacementInfo.replacementType == RPXLoader_BUNDLE || gReplacementInfo.replacementType == RPXLoader_BUNDLE_OTHER_RPX) {
+                gReplacementInfo.currentHash = StringTools::hash(gReplacementInfo.bundleMountInformation.path);
+
+                nn::act::Initialize();
+                nn::act::SlotNo slot = nn::act::GetSlotNo();
+                nn::act::Finalize();
+
+                std::string basePath = StringTools::strfmt("/vol/external01/wiiu/apps/save/%08X", gReplacementInfo.currentHash);
+                std::string common = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/common", gReplacementInfo.currentHash);
+                std::string user = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/%08X", gReplacementInfo.currentHash, 0x80000000 | slot);
+
+                strncpy(gReplacementInfo.savePath, basePath.c_str(), sizeof(gReplacementInfo.savePath));
+                memset(gReplacementInfo.bundleMountInformation.workingDir, 0, sizeof(gReplacementInfo.bundleMountInformation.workingDir));
+
+                CreateSubfolder(common.c_str());
+                CreateSubfolder(user.c_str());
+                DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
+                if (romfsMount("rom", gReplacementInfo.bundleMountInformation.path, RomfsSource_FileDescriptor_CafeOS) == 0) {
+                    DEBUG_FUNCTION_LINE("Mounted %s to /vol/content", gReplacementInfo.bundleMountInformation.path);
+                    gReplacementInfo.bundleMountInformation.isMounted = true;
+                } else {
+                    DEBUG_FUNCTION_LINE("Failed to mount %s", gReplacementInfo.bundleMountInformation.path);
+                    gReplacementInfo.bundleMountInformation.isMounted = false;
+                }
+            } else if (gReplacementInfo.replacementType == RPXLoader_RPX) {
+                //
+            }
+        }
+        DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
     }
 }
 

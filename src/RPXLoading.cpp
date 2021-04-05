@@ -295,6 +295,14 @@ bool RL_RedirectContentWithFallback(const char * newContentPath) {
     return true;
 }
 
+bool RL_DisableContentRedirection() {
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_NONE;
+        return true;
+    }
+    return false;
+}
+
 WUMS_EXPORT_FUNCTION(RL_LoadFromSDOnNextLaunch);
 WUMS_EXPORT_FUNCTION(RL_MountBundle);
 WUMS_EXPORT_FUNCTION(RL_UnmountBundle);
@@ -303,3 +311,4 @@ WUMS_EXPORT_FUNCTION(RL_FileRead);
 WUMS_EXPORT_FUNCTION(RL_FileClose);
 WUMS_EXPORT_FUNCTION(RL_FileExists);
 WUMS_EXPORT_FUNCTION(RL_RedirectContentWithFallback);
+WUMS_EXPORT_FUNCTION(RL_DisableContentRedirection);

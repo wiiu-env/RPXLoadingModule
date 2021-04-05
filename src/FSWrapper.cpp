@@ -36,6 +36,9 @@ inline void getFullPath(char *pathForCheck, int pathSize, char *path) {
 }
 
 inline bool checkForSave(char *pathForCheck, int pathSize, char *path) {
+    if (!gReplacementInfo.contentReplacementInfo.replaceSave) {
+        return false;
+    }
     if (strncmp(path, "/vol/save", 9) == 0) {
         int copyLen = strlen(path);
         char copy[copyLen + 1];
@@ -468,8 +471,7 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
 
     getFullPath(pathForCheck, sizeof(pathForCheck), path);
 
-    if (gReplacementInfo.contentReplacementInfo.replaceSave &&
-        checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
         DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
         return fallback_function(pathForCheck);
     }

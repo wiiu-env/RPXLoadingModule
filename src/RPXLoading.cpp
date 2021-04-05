@@ -280,6 +280,21 @@ bool RL_FileExists(const char *name) {
     return CheckFile(name) || CheckFile(checkgz.c_str());
 }
 
+bool RL_RedirectContentWithFallback(const char * newContentPath) {
+    auto dirHandle = opendir(newContentPath);
+    if (dirHandle == nullptr) {
+        return false;
+    }
+    closedir(dirHandle);
+
+    gReplacementInfo.contentReplacementInfo.replacementPath[0] = '\0';
+    strncat(gReplacementInfo.contentReplacementInfo.replacementPath, newContentPath, sizeof(gReplacementInfo.contentReplacementInfo.replacementPath) - 1);
+    gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_FROM_PATH;
+    gReplacementInfo.contentReplacementInfo.fallbackOnError = true;
+    gReplacementInfo.contentReplacementInfo.replaceSave = false;
+    return true;
+}
+
 WUMS_EXPORT_FUNCTION(RL_LoadFromSDOnNextLaunch);
 WUMS_EXPORT_FUNCTION(RL_MountBundle);
 WUMS_EXPORT_FUNCTION(RL_UnmountBundle);
@@ -287,3 +302,4 @@ WUMS_EXPORT_FUNCTION(RL_FileOpen);
 WUMS_EXPORT_FUNCTION(RL_FileRead);
 WUMS_EXPORT_FUNCTION(RL_FileClose);
 WUMS_EXPORT_FUNCTION(RL_FileExists);
+WUMS_EXPORT_FUNCTION(RL_RedirectContentWithFallback);

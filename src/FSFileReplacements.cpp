@@ -344,17 +344,6 @@ DECL_FUNCTION(FSStatus, FSGetFreeSpaceSizeAsync, FSClient *client, FSCmdBlock *b
     return real_FSGetFreeSpaceSizeAsync(client, block, path, outSize, errorMask, asyncData);
 }
 
-DECL_FUNCTION(FSStatus, FSChangeDirAsync, FSClient *client, FSCmdBlock *block, const char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
-    DEBUG_FUNCTION_LINE("FSChangeDirAsync %s", path);
-    strncpy(gReplacementInfo.bundleMountInformation.workingDir, path, sizeof(gReplacementInfo.bundleMountInformation.workingDir));
-    int len = strlen(gReplacementInfo.bundleMountInformation.workingDir);
-    if(len > 0 && gReplacementInfo.bundleMountInformation.workingDir[len-1] != '/'){
-        gReplacementInfo.bundleMountInformation.workingDir[len-1] = '/';
-        gReplacementInfo.bundleMountInformation.workingDir[len] = 0;
-    }
-    DCFlushRange(gReplacementInfo.bundleMountInformation.workingDir, sizeof(gReplacementInfo.bundleMountInformation.workingDir));
-    return real_FSChangeDirAsync(client, block, path, errorMask, asyncData);
-}
 
 function_replacement_data_t fs_file_function_replacements[] = {
         REPLACE_FUNCTION(FSOpenFile, LIBRARY_COREINIT, FSOpenFile),
@@ -398,8 +387,6 @@ function_replacement_data_t fs_file_function_replacements[] = {
 
         REPLACE_FUNCTION(FSFlushFile, LIBRARY_COREINIT, FSFlushFile),
         REPLACE_FUNCTION(FSFlushFileAsync, LIBRARY_COREINIT, FSFlushFileAsync),
-
-        REPLACE_FUNCTION(FSChangeDirAsync, LIBRARY_COREINIT, FSChangeDirAsync),
 
         //REPLACE_FUNCTION(FSChangeModeAsync, LIBRARY_COREINIT, FSChangeModeAsync),
 

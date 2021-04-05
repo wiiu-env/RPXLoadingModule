@@ -32,11 +32,16 @@ WUMS_INITIALIZE() {
 
 
 WUMS_APPLICATION_ENDS() {
-    if (gReplacementInfo.bundleMountInformation.isMounted) {
-        DEBUG_FUNCTION_LINE("Unmount /vol/content");
-        romfsUnmount("rom");
-        gReplacementInfo.bundleMountInformation.isMounted = false;
-        DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_NONE;
+    }
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {
+        if (gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) {
+            DEBUG_FUNCTION_LINE("Unmount /vol/content");
+            romfsUnmount("rom");
+            gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
+            DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+        }
     }
 }
 
@@ -46,46 +51,56 @@ WUMS_APPLICATION_STARTS() {
         return;
     }
     WHBLogUdpInit();
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        return;
+    }
+
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) != OSGetTitleID()) {
         DEBUG_FUNCTION_LINE("Set gTryToReplaceOnNextLaunch, gReplacedRPX and gIsMounted to FALSE");
-        gReplacementInfo.replacementType = RPXLoader_NONE;
-        gReplacementInfo.isRPXReplaced = false;
-        gReplacementInfo.bundleMountInformation.isMounted = false;
-        gReplacementInfo.bundleMountInformation.redirectionRequested = false;
+        gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_NONE;
         DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
     } else {
-        if (gReplacementInfo.replacementType != RPXLoader_NONE) {
-            gReplacementInfo.isRPXReplaced =  true;
-        }
-        if (gReplacementInfo.bundleMountInformation.redirectionRequested) {
-            if (gReplacementInfo.replacementType == RPXLoader_BUNDLE || gReplacementInfo.replacementType == RPXLoader_BUNDLE_OTHER_RPX) {
-                gReplacementInfo.currentHash = StringTools::hash(gReplacementInfo.bundleMountInformation.path);
+        if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {
+            uint32_t currentHash = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
 
-                nn::act::Initialize();
-                nn::act::SlotNo slot = nn::act::GetSlotNo();
-                nn::act::Finalize();
+            nn::act::Initialize();
+            nn::act::PersistentId slot = nn::act::GetPersistentId();
+            nn::act::Finalize();
 
-                std::string basePath = StringTools::strfmt("/vol/external01/wiiu/apps/save/%08X", gReplacementInfo.currentHash);
-                std::string common = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/common", gReplacementInfo.currentHash);
-                std::string user = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/%08X", gReplacementInfo.currentHash, 0x80000000 | slot);
+            std::string basePath = StringTools::strfmt("/vol/external01/wiiu/apps/save/%08X", currentHash);
+            std::string common = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/common", currentHash);
+            std::string user = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/%08X", currentHash, 0x80000000 | slot);
 
-                strncpy(gReplacementInfo.savePath, basePath.c_str(), sizeof(gReplacementInfo.savePath));
-                memset(gReplacementInfo.bundleMountInformation.workingDir, 0, sizeof(gReplacementInfo.bundleMountInformation.workingDir));
+            gReplacementInfo.contentReplacementInfo.savePath[0] = '\0';
+            strncat(gReplacementInfo.contentReplacementInfo.savePath,
+                    basePath.c_str(),
+                    sizeof(gReplacementInfo.contentReplacementInfo.savePath) - 1);
 
-                CreateSubfolder(common.c_str());
-                CreateSubfolder(user.c_str());
-                DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
-                if (romfsMount("rom", gReplacementInfo.bundleMountInformation.path, RomfsSource_FileDescriptor_CafeOS) == 0) {
-                    DEBUG_FUNCTION_LINE("Mounted %s to /vol/content", gReplacementInfo.bundleMountInformation.path);
-                    gReplacementInfo.bundleMountInformation.isMounted = true;
-                } else {
-                    DEBUG_FUNCTION_LINE("Failed to mount %s", gReplacementInfo.bundleMountInformation.path);
-                    gReplacementInfo.bundleMountInformation.isMounted = false;
-                }
-            } else if (gReplacementInfo.replacementType == RPXLoader_RPX) {
-                //
+            memset(gReplacementInfo.contentReplacementInfo.workingDir, 0, sizeof(gReplacementInfo.contentReplacementInfo.workingDir));
+
+            CreateSubfolder(common.c_str());
+            CreateSubfolder(user.c_str());
+            DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
+            if (romfsMount("rom", gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath, RomfsSource_FileDescriptor_CafeOS) == 0) {
+                gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath[0] = '\0';
+                strncat(gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath,
+                        gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath,
+                        sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath) - 1);
+
+
+                gReplacementInfo.contentReplacementInfo.replacementPath[0] = '\0';
+                strncat(gReplacementInfo.contentReplacementInfo.replacementPath,
+                        "rom:/content",
+                        sizeof(gReplacementInfo.contentReplacementInfo.replacementPath) - 1);
+
+                DEBUG_FUNCTION_LINE("Mounted %s to /vol/content", gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath);
+                gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = true;
+            } else {
+                DEBUG_FUNCTION_LINE("Failed to mount %s", gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
+                gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
             }
         }
+
         DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
     }
 }

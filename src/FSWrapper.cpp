@@ -17,23 +17,32 @@ fileMagic_t file_handles[FILE_HANDLES_LENGTH];
 std::mutex dir_handle_mutex;
 std::mutex file_handle_mutex;
 
+static inline void replaceContentPath(char *pathForCheck, int pathForCheckSize, int replaceLen, char *replaceWith);
+
 inline void getFullPath(char *pathForCheck, int pathSize, char *path) {
     if (path[0] != '/' && path[0] != '\\') {
-        snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.bundleMountInformation.workingDir, path);
+        snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.contentReplacementInfo.workingDir, path);
         DEBUG_FUNCTION_LINE_VERBOSE("Real path is %s", path);
     } else {
-        strncpy(pathForCheck, path, pathSize - 1);
+        pathForCheck[0] = '\0';
+        strncat(pathForCheck, path, pathSize - 1);
+    }
+
+    for(int i = 0; i < strlen(pathForCheck);i++){
+        if(pathForCheck[i] == '\\'){
+            pathForCheck[i] = '/';
+        }
     }
 }
 
 inline bool checkForSave(char *pathForCheck, int pathSize, char *path) {
     if (strncmp(path, "/vol/save", 9) == 0) {
         int copyLen = strlen(path);
-        char copy[copyLen+1];
+        char copy[copyLen + 1];
         memcpy(copy, path, copyLen);
         copy[copyLen] = 0;
-        memset(pathForCheck,0, pathSize);
-        snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.savePath, &copy[9]);
+        memset(pathForCheck, 0, pathSize);
+        snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.contentReplacementInfo.savePath, &copy[9]);
         return true;
     }
     return false;
@@ -127,7 +136,8 @@ FSStatus FSOpenDirWrapper(char *path,
                           FSErrorFlag errorMask,
                           std::function<FSStatus(char *_path)> fallback_function,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -145,9 +155,9 @@ FSStatus FSOpenDirWrapper(char *path,
     }
 
     if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
-        memcpy(pathForCheck, "rom:", 4);
+        replaceContentPath(pathForCheck, sizeof(pathForCheck), 12, gReplacementInfo.contentReplacementInfo.replacementPath);
 
-        DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
+        DEBUG_FUNCTION_LINE_VERBOSE("%s -> %s", path, pathForCheck);
         FSStatus result = FS_STATUS_OK;
 
         int handle_index = getNewDirHandleIndex();
@@ -160,11 +170,17 @@ FSStatus FSOpenDirWrapper(char *path,
                 *handle = dir_handles[handle_index].handle;
                 dir_handles[handle_index].dir = dir;
                 dir_handles[handle_index].in_use = true;
-                strncpy(dir_handles[handle_index].path, pathForCheck, 255);
+
+                dir_handles[handle_index].path[0] = '\0';
+                strncat(dir_handles[handle_index].path, pathForCheck, sizeof(dir_handles[handle_index].path) - 1);
+
                 DCFlushRange(&dir_handles[handle_index], sizeof(dirMagic_t));
                 OSUnlockMutex(dir_handles[handle_index].mutex);
             } else {
                 DEBUG_FUNCTION_LINE("Dir not found %s", pathForCheck);
+                if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
+                    return FS_STATUS_USE_REAL_OS;
+                }
                 if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
                     result = FS_STATUS_NOT_FOUND;
                 }
@@ -183,7 +199,10 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
                           FSDirectoryEntry *entry,
                           FSErrorFlag errorMask,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidDirHandle(handle)) {
+
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidDirHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -199,7 +218,8 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
     struct dirent *entry_ = readdir(dir);
     FSStatus result = FS_STATUS_END;
     if (entry_) {
-        strncpy(entry->name, entry_->d_name, 254);
+        entry->name[0] = '\0';
+        strncat(entry->name, entry_->d_name, sizeof(entry->name)-1);
         entry->info.mode = (FSMode) FS_MODE_READ_OWNER;
         if (entry_->d_type == DT_DIR) {
             entry->info.flags = (FSStatFlags) ((uint32_t) FS_STAT_DIRECTORY);
@@ -231,7 +251,9 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
 FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
                            FSErrorFlag errorMask,
                            std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidDirHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidDirHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -257,7 +279,9 @@ FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
 FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
                             FSErrorFlag errorMask,
                             std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidDirHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidDirHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -278,7 +302,9 @@ FSStatus FSMakeDirWrapper(char *path,
                           FSErrorFlag errorMask,
                           std::function<FSStatus(char *_path)> fallback_function,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -307,7 +333,8 @@ FSStatus FSOpenFileWrapper(char *path,
                            FSErrorFlag errorMask,
                            std::function<FSStatus(char *_path)> fallback_function,
                            std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
     if (path == nullptr) {
@@ -318,6 +345,7 @@ FSStatus FSOpenFileWrapper(char *path,
     char pathForCheck[256];
 
     getFullPath(pathForCheck, sizeof(pathForCheck), path);
+    DEBUG_FUNCTION_LINE_VERBOSE("%s -> %s", path, pathForCheck);
 
     if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
         DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
@@ -329,8 +357,9 @@ FSStatus FSOpenFileWrapper(char *path,
     }
 
     if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
-        memcpy(pathForCheck, "rom:", 4);
-        DEBUG_FUNCTION_LINE_VERBOSE("Trying to open %s", pathForCheck);
+        replaceContentPath(pathForCheck, sizeof(pathForCheck), 12, gReplacementInfo.contentReplacementInfo.replacementPath);
+
+        DEBUG_FUNCTION_LINE_VERBOSE("%s -> %s", path, pathForCheck);
         int handle_index = getNewFileHandleIndex();
         FSStatus result = FS_STATUS_OK;
         if (handle_index >= 0) {
@@ -368,17 +397,24 @@ FSStatus FSOpenFileWrapper(char *path,
                 DCFlushRange(&file_handles[handle_index], sizeof(fileMagic_t));
             } else {
                 DEBUG_FUNCTION_LINE("File not found %s", pathForCheck);
-                if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
+                if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
+                    result = FS_STATUS_USE_REAL_OS;
+                } else if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
                     result = FS_STATUS_NOT_FOUND;
                 }
             }
             OSUnlockMutex(file_handles[handle_index].mutex);
         } else {
-            if (errorMask & FS_ERROR_FLAG_MAX) {
+            if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
+                result = FS_STATUS_USE_REAL_OS;
+            } else if (errorMask & FS_ERROR_FLAG_MAX) {
                 result = FS_STATUS_MAX;
             }
         }
-        return result_handler(result);
+        if (result != FS_STATUS_USE_REAL_OS) {
+            DEBUG_FUNCTION_LINE_VERBOSE("return error %d", result);
+            return result_handler(result);
+        }
     }
     return FS_STATUS_USE_REAL_OS;
 }
@@ -386,7 +422,9 @@ FSStatus FSOpenFileWrapper(char *path,
 FSStatus FSCloseFileWrapper(FSFileHandle handle,
                             FSErrorFlag errorMask,
                             std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -417,7 +455,8 @@ FSStatus FSCloseFileWrapper(FSFileHandle handle,
 FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
                           std::function<FSStatus(char *_path)> fallback_function,
                           std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
     if (path == nullptr) {
@@ -429,22 +468,30 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
 
     getFullPath(pathForCheck, sizeof(pathForCheck), path);
 
-    if (checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
+    if (gReplacementInfo.contentReplacementInfo.replaceSave &&
+        checkForSave(pathForCheck, sizeof(pathForCheck), pathForCheck)) {
         DEBUG_FUNCTION_LINE("Redirect save to %s", pathForCheck);
         return fallback_function(pathForCheck);
     }
     if (strncmp(pathForCheck, "/vol/content", 12) == 0) {
-        memcpy(pathForCheck, "rom:", 4);
+        replaceContentPath(pathForCheck, sizeof(pathForCheck), 12, gReplacementInfo.contentReplacementInfo.replacementPath);
+        DEBUG_FUNCTION_LINE("%s -> %s", path, pathForCheck);
+
         FSStatus result = FS_STATUS_OK;
         if (stats == nullptr) {
+            if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
+                return FS_STATUS_USE_REAL_OS;
+            }
             DEBUG_FUNCTION_LINE("Invalid args");
             return FS_STATUS_FATAL_ERROR;
         } else {
             struct stat path_stat{};
             memset(&path_stat, 0, sizeof(path_stat));
             if (stat(pathForCheck, &path_stat) < 0) {
-                DEBUG_FUNCTION_LINE("Path not found %s", pathForCheck);
-                if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
+                if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
+                    return FS_STATUS_USE_REAL_OS;
+                } else if (errorMask & FS_ERROR_FLAG_NOT_FOUND) {
+                    DEBUG_FUNCTION_LINE("Path not found %s", pathForCheck);
                     result = FS_STATUS_NOT_FOUND;
                 }
             } else {
@@ -466,11 +513,26 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
     return FS_STATUS_USE_REAL_OS;
 }
 
+static inline void replaceContentPath(char *pathForCheck, int pathForCheckSize, int skipLen, char *replaceWith) {
+    int subStrLen = strlen(pathForCheck) - skipLen;
+    if (subStrLen <= 0) {
+        pathForCheck[0] = '\0';
+        strncat(pathForCheck, replaceWith, sizeof(pathForCheck) - 1);
+    } else {
+        char pathCopy[subStrLen+1];
+        pathCopy[0] = '\0';
+        strncat(pathCopy, &pathForCheck[skipLen], sizeof(pathCopy) - 1);
+        snprintf(pathForCheck, pathForCheckSize, "%s%s", replaceWith, pathCopy);
+    }
+}
+
 FSStatus FSGetStatFileWrapper(FSFileHandle handle,
                               FSStat *stats,
                               FSErrorFlag errorMask,
                               std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -511,7 +573,9 @@ FSStatus FSReadFileWrapper(void *buffer,
                            uint32_t unk1,
                            FSErrorFlag errorMask,
                            std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -556,7 +620,9 @@ FSStatus FSReadFileWithPosWrapper(void *buffer,
                                   int32_t unk1,
                                   FSErrorFlag errorMask,
                                   std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     FSStatus result;
@@ -579,7 +645,9 @@ FSStatus FSSetPosFileWrapper(FSFileHandle handle,
                              uint32_t pos,
                              FSErrorFlag errorMask,
                              std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -609,7 +677,9 @@ FSStatus FSGetPosFileWrapper(FSFileHandle handle,
                              uint32_t *pos,
                              FSErrorFlag errorMask,
                              std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -640,7 +710,9 @@ FSStatus FSGetPosFileWrapper(FSFileHandle handle,
 FSStatus FSIsEofWrapper(FSFileHandle handle,
                         FSErrorFlag errorMask,
                         std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -674,7 +746,10 @@ FSStatus FSIsEofWrapper(FSFileHandle handle,
 FSStatus FSTruncateFileWrapper(FSFileHandle handle,
                                FSErrorFlag errorMask,
                                std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     uint32_t handle_index = handle & HANDLE_MASK;
@@ -697,7 +772,10 @@ FSStatus FSWriteFileWrapper(uint8_t *buffer,
                             uint32_t unk1,
                             FSErrorFlag errorMask,
                             std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) ||
+        !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
     FSStatus result = FS_STATUS_OK;
@@ -711,7 +789,9 @@ FSStatus FSRemoveWrapper(char *path,
                          FSErrorFlag errorMask,
                          std::function<FSStatus(char *_path)> fallback_function,
                          std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -740,7 +820,9 @@ FSStatus FSRenameWrapper(char *oldPath,
                          FSErrorFlag errorMask,
                          std::function<FSStatus(char *_oldPath, char *_newPath)> fallback_function,
                          std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
 
@@ -767,10 +849,13 @@ FSStatus FSRenameWrapper(char *oldPath,
 }
 
 FSStatus FSFlushFileWrapper(FSFileHandle handle, FSErrorFlag errorMask, std::function<FSStatus(FSStatus)> result_handler) {
-    if (!gReplacementInfo.bundleMountInformation.isMounted || !isValidFileHandle(handle)) {
+    if ((gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_NONE) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) ||
+        (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE && !gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted)) {
         return FS_STATUS_USE_REAL_OS;
     }
     FSStatus result = FS_STATUS_OK;
+
     if (errorMask & FS_ERROR_FLAG_ACCESS_ERROR) {
         result = FS_STATUS_ACCESS_ERROR;
     }

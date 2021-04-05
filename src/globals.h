@@ -8,27 +8,43 @@ typedef struct MetaInformation_t {
 } MetaInformation;
 
 typedef struct BundleMountInformation_t {
-    bool redirectionRequested;
     bool isMounted;
-    char path[255];
-    char workingDir[255];
+    char toMountPath[255];
+    char mountedPath[255];
 } BundleMountInformation;
 
-typedef enum RPXLoader_Type {
-    RPXLoader_NONE,
-    RPXLoader_RPX,
-    RPXLoader_BUNDLE,
-    RPXLoader_BUNDLE_OTHER_RPX,
-} RPXLoader_Type;
-
-typedef struct RPXLoader_ReplacementInformation_t {
+typedef struct RPXReplacementInfo_t {
     bool isRPXReplaced;
     MetaInformation metaInformation;
-    RPXLoader_Type replacementType;
-    BundleMountInformation bundleMountInformation;
     char iconCache[65580];
-    uint32_t currentHash;
+} RPXReplacementInfo;
+
+typedef enum ContentRedirect_Mode {
+    CONTENTREDIRECT_NONE,
+    CONTENTREDIRECT_FROM_WUHB_BUNDLE,
+    CONTENTREDIRECT_FROM_PATH,
+} ContentRedirect_Mode;
+
+typedef struct ContentReplacementInfo_t {
+    ContentRedirect_Mode mode;
+
+    BundleMountInformation bundleMountInformation;
+
+    char workingDir[255];
+
+    char replacementPath[255];
+
+    bool replaceSave;
+
     char savePath[255];
+
+    bool fallbackOnError;
+} ContentReplacementInfo;
+
+typedef struct RPXLoader_ReplacementInformation_t {
+    RPXReplacementInfo rpxReplacementInfo;
+    ContentReplacementInfo contentReplacementInfo;
 } RPXLoader_ReplacementInformation;
+
 
 extern RPXLoader_ReplacementInformation gReplacementInfo;

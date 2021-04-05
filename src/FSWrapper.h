@@ -10,7 +10,7 @@ typedef struct dirMagic {
     uint32_t handle;
     DIR *dir;
     bool in_use;
-    char path[255];
+    char path[256];
     OSMutex *mutex;
 } dirMagic_t;
 

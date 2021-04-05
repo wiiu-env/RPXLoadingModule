@@ -1,5 +1,6 @@
 #include "FSDirReplacements.h"
 #include <coreinit/filesystem.h>
+#include <coreinit/cache.h>
 #include "utils/logger.h"
 #include "globals.h"
 #include "FSWrapper.h"
@@ -134,6 +135,18 @@ DECL_FUNCTION(FSStatus, FSMakeDirAsync, FSClient *client, FSCmdBlock *block, cha
     return real_FSMakeDirAsync(client, block, path, errorMask, asyncData);
 }
 
+DECL_FUNCTION(FSStatus, FSChangeDirAsync, FSClient *client, FSCmdBlock *block, const char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
+    DEBUG_FUNCTION_LINE_VERBOSE("FSChangeDirAsync %s", path);
+    snprintf(gReplacementInfo.contentReplacementInfo.workingDir, sizeof(gReplacementInfo.contentReplacementInfo.workingDir), "%s", path);
+    int len = strlen(gReplacementInfo.contentReplacementInfo.workingDir);
+    if (len > 0 && gReplacementInfo.contentReplacementInfo.workingDir[len - 1] != '/') {
+        gReplacementInfo.contentReplacementInfo.workingDir[len - 1] = '/';
+        gReplacementInfo.contentReplacementInfo.workingDir[len] = 0;
+    }
+    DCFlushRange(gReplacementInfo.contentReplacementInfo.workingDir, sizeof(gReplacementInfo.contentReplacementInfo.workingDir));
+    return real_FSChangeDirAsync(client, block, path, errorMask, asyncData);
+}
+
 function_replacement_data_t fs_dir_function_replacements[] = {
         REPLACE_FUNCTION(FSOpenDir, LIBRARY_COREINIT, FSOpenDir),
         REPLACE_FUNCTION(FSOpenDirAsync, LIBRARY_COREINIT, FSOpenDirAsync),
@@ -149,6 +162,8 @@ function_replacement_data_t fs_dir_function_replacements[] = {
 
         REPLACE_FUNCTION(FSMakeDir, LIBRARY_COREINIT, FSMakeDir),
         REPLACE_FUNCTION(FSMakeDirAsync, LIBRARY_COREINIT, FSMakeDirAsync),
+
+        REPLACE_FUNCTION(FSChangeDirAsync, LIBRARY_COREINIT, FSChangeDirAsync),
 };
 
 uint32_t fs_dir_function_replacements_size = sizeof(fs_dir_function_replacements) / sizeof(function_replacement_data_t);

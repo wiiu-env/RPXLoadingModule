@@ -30,7 +30,7 @@ std::mutex sendMutex;
 FSStatus send_result_async(FSClient *client, FSCmdBlock *block, FSAsyncData *asyncData, FSStatus status) {
     if (asyncData->callback != nullptr) {
         if (asyncData->ioMsgQueue != nullptr) {
-            OSFatal("ERROR: callback and ioMsgQueue both set.");
+            //OSFatal("ERROR: callback and ioMsgQueue both set.");
             return FS_STATUS_FATAL_ERROR;
         }
         // userCallbacks are called in the DefaultAppIOQueue.

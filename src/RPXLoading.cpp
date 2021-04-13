@@ -198,11 +198,11 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
 
     if (!success) {
-        gReplacementInfo.rpxReplacementInfo.isRPXReplaced = false;
+        gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
         DEBUG_FUNCTION_LINE("Failed to load %s on next restart", request.path);
         return false;
     } else {
-        gReplacementInfo.rpxReplacementInfo.isRPXReplaced = true;
+        gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = true;
     }
 
     DEBUG_FUNCTION_LINE("Launch %s on next restart [size: %08X offset: %08X]", request.path, request.filesize, request.fileoffset);
@@ -216,7 +216,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
         gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_FROM_WUHB_BUNDLE;
     } else {
         DEBUG_FUNCTION_LINE("Loaded file is no bundle");
-        gReplacementInfo.rpxReplacementInfo.isRPXReplaced = true;
+        gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = true;
 
         if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE &&
             gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) {

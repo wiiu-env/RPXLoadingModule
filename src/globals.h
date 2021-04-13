@@ -14,6 +14,7 @@ typedef struct BundleMountInformation_t {
 } BundleMountInformation;
 
 typedef struct RPXReplacementInfo_t {
+    bool willRPXBeReplaced;
     bool isRPXReplaced;
     MetaInformation metaInformation;
     char iconCache[65580];

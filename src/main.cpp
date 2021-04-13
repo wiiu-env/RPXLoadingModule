@@ -43,12 +43,17 @@ WUMS_APPLICATION_ENDS() {
             DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
         }
     }
+    gReplacementInfo.rpxReplacementInfo.isRPXReplaced = false;
 }
 
 WUMS_APPLICATION_STARTS() {
     uint32_t upid = OSGetUPID();
     if (upid != 2 && upid != 15) {
         return;
+    }
+    if (gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced) {
+        gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
+        gReplacementInfo.rpxReplacementInfo.isRPXReplaced = true;
     }
     WHBLogUdpInit();
     if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {

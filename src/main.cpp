@@ -61,8 +61,9 @@ WUMS_APPLICATION_STARTS() {
     }
 
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) != OSGetTitleID()) {
-        DEBUG_FUNCTION_LINE("Set gTryToReplaceOnNextLaunch, gReplacedRPX and gIsMounted to FALSE");
+        DEBUG_FUNCTION_LINE("Set mode to CONTENTREDIRECT_NONE and replaceSave to false");
         gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_NONE;
+        gReplacementInfo.contentReplacementInfo.replaceSave = false;
         DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
     } else {
         if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {

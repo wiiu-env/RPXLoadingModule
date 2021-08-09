@@ -216,6 +216,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
                 completePath.c_str(),
                 sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) - 1);
         gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_FROM_WUHB_BUNDLE;
+        gReplacementInfo.contentReplacementInfo.replaceSave = true;
     } else {
         DEBUG_FUNCTION_LINE("Loaded file is no bundle");
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = true;
@@ -227,6 +228,8 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
             strncat(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath,
                     gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath,
                     sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) - 1);
+        } else {
+            gReplacementInfo.contentReplacementInfo.replaceSave = false;
         }
     }
 

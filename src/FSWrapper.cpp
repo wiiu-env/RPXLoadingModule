@@ -22,7 +22,7 @@ static inline void replaceContentPath(char *pathForCheck, int pathForCheckSize, 
 inline void getFullPath(char *pathForCheck, int pathSize, char *path) {
     if (path[0] != '/' && path[0] != '\\') {
         snprintf(pathForCheck, pathSize, "%s%s", gReplacementInfo.contentReplacementInfo.workingDir, path);
-        DEBUG_FUNCTION_LINE_VERBOSE("Real path is %s", path);
+        DEBUG_FUNCTION_LINE_VERBOSE("Real path is %s", pathForCheck);
     } else {
         pathForCheck[0] = '\0';
         strncat(pathForCheck, path, pathSize - 1);
@@ -390,7 +390,7 @@ FSStatus FSOpenFileWrapper(char *path,
 
             int32_t fd = open(pathForCheck, _mode);
             if (fd >= 0) {
-                DEBUG_FUNCTION_LINE_VERBOSE("opened file successfully %d", fd);
+                DEBUG_FUNCTION_LINE_VERBOSE("Opened %s as  %d", pathForCheck, fd);
 
                 file_handles[handle_index].handle = FILE_HANDLE_MAGIC + handle_index;
                 //DEBUG_FUNCTION_LINE("handle %08X", file_handles[handle_index].handle);
@@ -507,7 +507,7 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
                     stats->owner = path_stat.st_uid;
                     stats->group = path_stat.st_gid;
                 }
-                //DEBUG_FUNCTION_LINE("stats file for %s, size %016lLX", path, stats->size);
+                DEBUG_FUNCTION_LINE_VERBOSE("stats file for %s, size %016lLX", path, stats->size);
             }
         }
         return result_handler(result);
@@ -627,6 +627,7 @@ FSStatus FSReadFileWithPosWrapper(void *buffer,
         !isValidFileHandle(handle)) {
         return FS_STATUS_USE_REAL_OS;
     }
+
     FSStatus result;
     if ((result = FSSetPosFileWrapper(handle, pos, errorMask,
                                       [](FSStatus res) -> FSStatus { return res; })
@@ -637,6 +638,7 @@ FSStatus FSReadFileWithPosWrapper(void *buffer,
     result = FSReadFileWrapper(buffer, size, count, handle, unk1, errorMask,
                                [](FSStatus res) -> FSStatus { return res; }
     );
+
     if (result != FS_STATUS_USE_REAL_OS && result != FS_STATUS_FATAL_ERROR) {
         return result_handler(result);
     }
@@ -669,7 +671,7 @@ FSStatus FSSetPosFileWrapper(FSFileHandle handle,
         DEBUG_FUNCTION_LINE("Seek failed");
         result = FS_STATUS_MEDIA_ERROR;
     }
-    DEBUG_FUNCTION_LINE_VERBOSE("pos set to %d ", pos, real_fd);
+    DEBUG_FUNCTION_LINE_VERBOSE("pos set to %d for %d", pos, real_fd);
 
     OSUnlockMutex(file_handles[handle_index].mutex);
     return result_handler(result);
@@ -698,7 +700,7 @@ FSStatus FSGetPosFileWrapper(FSFileHandle handle,
 
     off_t currentPos = lseek(real_fd, (off_t) 0, SEEK_CUR);
     if (currentPos == -1) {
-        DEBUG_FUNCTION_LINE("Failed to get current pos");
+        DEBUG_FUNCTION_LINE("Failed to get current pos for %d", real_fd);
         result = FS_STATUS_MEDIA_ERROR;
     } else {
         *pos = currentPos;

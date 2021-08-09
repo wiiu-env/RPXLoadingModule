@@ -20,7 +20,6 @@ extern "C" {
     } while (0)
 
 
-
 //#define DEBUG_FUNCTION_LINE_VERBOSE(FMT, ARGS...)  DEBUG_FUNCTION_LINE(FMT, ##ARGS)
 #define DEBUG_FUNCTION_LINE_VERBOSE(FMT, ARGS...)
 

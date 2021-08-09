@@ -15,6 +15,8 @@
 #include "utils/ini.h"
 #include <cstring>
 #include <rpxloader.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 
 /*

@@ -19,6 +19,8 @@
 
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 
+WUMS_USE_WUT_DEVOPTAB();
+
 WUMS_INITIALIZE() {
     WHBLogUdpInit();
     DEBUG_FUNCTION_LINE("Patch functions");

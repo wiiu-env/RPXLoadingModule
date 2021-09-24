@@ -37,48 +37,48 @@ extern fileMagic_t file_handles[FILE_HANDLES_LENGTH];
 FSStatus FSOpenDirWrapper(char *path,
                           FSDirectoryHandle *handle,
                           FSErrorFlag errorMask,
-                          std::function<FSStatus(char *_path)> fallback_function,
-                          std::function<FSStatus(FSStatus)> result_handler);
+                          const std::function<FSStatus(char *)>& fallback_function,
+                          const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
                           FSDirectoryEntry *entry,
                           FSErrorFlag errorMask,
-                          std::function<FSStatus(FSStatus)> result_handler);
+                          const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
                            FSErrorFlag errorMask,
-                           std::function<FSStatus(FSStatus)> result_handler);
+                           const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
                             FSErrorFlag errorMask,
-                            std::function<FSStatus(FSStatus)> result_handler);
+                            const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSMakeDirWrapper(char *path,
                           FSErrorFlag errorMask,
-                          std::function<FSStatus(char *_path)> fallback_function,
-                          std::function<FSStatus(FSStatus)> result_handler);
+                          const std::function<FSStatus(char *)>& fallback_function,
+                          const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSOpenFileWrapper(char *path,
                            const char *mode,
                            FSFileHandle *handle,
                            FSErrorFlag errorMask,
-                           std::function<FSStatus(char *_path)> fallback_function,
-                           std::function<FSStatus(FSStatus)> result_handler);
+                           const std::function<FSStatus(char *)>& fallback_function,
+                           const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSCloseFileWrapper(FSFileHandle handle,
                             FSErrorFlag errorMask,
-                            std::function<FSStatus(FSStatus)> result_handler);
+                            const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSGetStatWrapper(char *path,
                           FSStat *stats,
                           FSErrorFlag errorMask,
-                          std::function<FSStatus(char *_path)> fallback_function,
-                          std::function<FSStatus(FSStatus)> result_handler);
+                          const std::function<FSStatus(char *)>& fallback_function,
+                          const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSGetStatFileWrapper(FSFileHandle handle,
                               FSStat *stats,
                               FSErrorFlag errorMask,
-                              std::function<FSStatus(FSStatus)> result_handler);
+                              const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSReadFileWrapper(void *buffer,
                            uint32_t size,
@@ -86,7 +86,7 @@ FSStatus FSReadFileWrapper(void *buffer,
                            FSFileHandle handle,
                            uint32_t unk1,
                            FSErrorFlag errorMask,
-                           std::function<FSStatus(FSStatus)> result_handler);
+                           const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSReadFileWithPosWrapper(void *buffer,
                                   uint32_t size,
@@ -95,25 +95,25 @@ FSStatus FSReadFileWithPosWrapper(void *buffer,
                                   FSFileHandle handle,
                                   int32_t unk1,
                                   FSErrorFlag errorMask,
-                                  std::function<FSStatus(FSStatus)> result_handler);
+                                  const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSSetPosFileWrapper(FSFileHandle handle,
                              uint32_t pos,
                              FSErrorFlag errorMask,
-                             std::function<FSStatus(FSStatus)> result_handler);
+                             const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSGetPosFileWrapper(FSFileHandle handle,
                              uint32_t *pos,
                              FSErrorFlag errorMask,
-                             std::function<FSStatus(FSStatus)> result_handler);
+                             const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSIsEofWrapper(FSFileHandle handle,
                         FSErrorFlag errorMask,
-                        std::function<FSStatus(FSStatus)> result_handler);
+                        const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSTruncateFileWrapper(FSFileHandle handle,
                                FSErrorFlag errorMask,
-                               std::function<FSStatus(FSStatus)> result_handler);
+                               const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSWriteFileWrapper(uint8_t *buffer,
                             uint32_t size,
@@ -121,22 +121,22 @@ FSStatus FSWriteFileWrapper(uint8_t *buffer,
                             FSFileHandle handle,
                             uint32_t unk1,
                             FSErrorFlag errorMask,
-                            std::function<FSStatus(FSStatus)> result_handler);
+                            const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSRemoveWrapper(char *path,
                          FSErrorFlag errorMask,
-                         std::function<FSStatus(char *_path)> fallback_function,
-                         std::function<FSStatus(FSStatus)> result_handler);
+                         const std::function<FSStatus(char *)>& fallback_function,
+                         const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSRenameWrapper(char *oldPath,
                          char *newPath,
                          FSErrorFlag errorMask,
-                         std::function<FSStatus(char *_oldPath, char *_newPath)> fallback_function,
-                         std::function<FSStatus(FSStatus)> result_handler);
+                         const std::function<FSStatus(char *, char *)>& fallback_function,
+                         const std::function<FSStatus(FSStatus)>& result_handler);
 
 FSStatus FSFlushFileWrapper(FSFileHandle handle,
                             FSErrorFlag errorMask,
-                            std::function<FSStatus(FSStatus)> result_handler);
+                            const std::function<FSStatus(FSStatus)>& result_handler);
 
 int32_t getNewDirHandleIndex();
 

@@ -1,6 +1,9 @@
 #include "FileReaderCompressed.h"
 
 int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
+    if(!initDone){
+        return -11;
+    }
     int startValue = this->strm.total_out;
     uint32_t newSize = 0;
     int ret = 0;

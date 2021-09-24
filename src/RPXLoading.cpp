@@ -77,7 +77,6 @@ DECL_FUNCTION(FSStatus, RPX_FSCloseFile, FSClient *client, FSCmdBlock *block, FS
 }
 
 DECL_FUNCTION(void, Loader_ReportWarn) {
-   return;
 }
 
 function_replacement_data_t rpx_utils_function_replacements[] = {
@@ -285,7 +284,7 @@ bool RL_FileExists(const char *name) {
     return CheckFile(name) || CheckFile(checkgz.c_str());
 }
 
-bool RL_RedirectContentWithFallback(const char * newContentPath) {
+bool RL_RedirectContentWithFallback(const char *newContentPath) {
     auto dirHandle = opendir(newContentPath);
     if (dirHandle == nullptr) {
         return false;

@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#include <string.h>
+#include <cstring>
 #include <whb/log.h>
 #include "utils.h"
 
@@ -13,7 +13,7 @@ extern "C" {
 
 #define DEBUG_FUNCTION_LINE(FMT, ARGS...)do { \
     WHBLogPrintf("[%23s]%30s@L%04d: " FMT "",__FILENAME__,__FUNCTION__, __LINE__, ## ARGS); \
-    } while (0);
+    } while (0)
 
 #define OSFATAL_FUNCTION_LINE(FMT, ARGS...)do { \
     OSFatal_printf("[%s]%s@L%04d: " FMT "",__FILENAME__,__FUNCTION__, __LINE__, ## ARGS); \

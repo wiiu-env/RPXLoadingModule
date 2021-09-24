@@ -91,7 +91,7 @@ int32_t readIntoBuffer(int32_t handle, void *buffer, size_t size, size_t count) 
     return totalSize;
 }
 
-int32_t CheckFile(const char * filepath) {
+int32_t CheckFile(const char *filepath) {
     if (!filepath) {
         return 0;
     }
@@ -117,33 +117,33 @@ int32_t CheckFile(const char * filepath) {
     return 0;
 }
 
-int32_t CreateSubfolder(const char * fullpath) {
-    if(!fullpath)
+int32_t CreateSubfolder(const char *fullpath) {
+    if (!fullpath)
         return 0;
 
     int32_t result = 0;
 
-    char dirnoslash[strlen(fullpath)+1];
+    char dirnoslash[strlen(fullpath) + 1];
     strcpy(dirnoslash, fullpath);
 
-    int32_t pos = strlen(dirnoslash)-1;
-    while(dirnoslash[pos] == '/') {
+    int32_t pos = strlen(dirnoslash) - 1;
+    while (dirnoslash[pos] == '/') {
         dirnoslash[pos] = '\0';
         pos--;
     }
 
-    if(CheckFile(dirnoslash)) {
+    if (CheckFile(dirnoslash)) {
         return 1;
     } else {
-        char parentpath[strlen(dirnoslash)+2];
+        char parentpath[strlen(dirnoslash) + 2];
         strcpy(parentpath, dirnoslash);
-        char * ptr = strrchr(parentpath, '/');
+        char *ptr = strrchr(parentpath, '/');
 
-        if(!ptr) {
+        if (!ptr) {
             //!Device root directory (must be with '/')
             strcat(parentpath, "/");
             struct stat filestat{};
-            if (stat(parentpath, &filestat) == 0){
+            if (stat(parentpath, &filestat) == 0) {
                 return 1;
             }
 
@@ -186,7 +186,7 @@ int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info) {
             if (romfsGetFileInfoPerPath("rcc", (std::string("code/") + entry->d_name).c_str(), info) >= 0) {
                 found = true;
                 res = 0;
-            }else{
+            } else {
                 DEBUG_FUNCTION_LINE("Failed to get info for %s", entry->d_name);
             }
             break;

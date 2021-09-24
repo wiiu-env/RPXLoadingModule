@@ -23,4 +23,4 @@ int32_t CreateSubfolder(const char *fullpath);
 
 int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info);
 
-int32_t CheckFile(const char * filepath);
+int32_t CheckFile(const char *filepath);

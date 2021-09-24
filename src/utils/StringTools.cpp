@@ -290,7 +290,6 @@ char *StringTools::str_replace(char *orig, char *rep, char *with) {
 }
 
 
-
 /* hash: compute hash value of string */
 uint32_t StringTools::hash(char *str) {
     unsigned int h;

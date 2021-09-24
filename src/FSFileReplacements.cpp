@@ -130,7 +130,8 @@ DECL_FUNCTION(int32_t, FSReadFile, FSClient *client, FSCmdBlock *block, void *bu
     return real_FSReadFile(client, block, buffer, size, count, handle, unk1, errorMask);
 }
 
-DECL_FUNCTION(int32_t, FSReadFileAsync, FSClient *client, FSCmdBlock *block, void *buffer, uint32_t size, uint32_t count, FSFileHandle handle, uint32_t unk1, FSErrorFlag errorMask, FSAsyncData *asyncData) {
+DECL_FUNCTION(int32_t, FSReadFileAsync, FSClient *client, FSCmdBlock *block, void *buffer, uint32_t size, uint32_t count, FSFileHandle handle, uint32_t unk1, FSErrorFlag errorMask,
+              FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("");
     FSStatus result = FSReadFileWrapper(buffer, size, count, handle, unk1, errorMask, ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
@@ -152,7 +153,8 @@ DECL_FUNCTION(FSStatus, FSReadFileWithPos, FSClient *client, FSCmdBlock *block, 
     return res;
 }
 
-DECL_FUNCTION(int32_t, FSReadFileWithPosAsync, FSClient *client, FSCmdBlock *block, void *buffer, uint32_t size, uint32_t count, uint32_t pos, FSFileHandle handle, int32_t unk1, FSErrorFlag errorMask, FSAsyncData *asyncData) {
+DECL_FUNCTION(int32_t, FSReadFileWithPosAsync, FSClient *client, FSCmdBlock *block, void *buffer, uint32_t size, uint32_t count, uint32_t pos, FSFileHandle handle, int32_t unk1, FSErrorFlag errorMask,
+              FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("");
     FSStatus result = FSReadFileWithPosWrapper(buffer, size, count, pos, handle, unk1, errorMask, ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
@@ -228,7 +230,8 @@ DECL_FUNCTION(FSStatus, FSWriteFile, FSClient *client, FSCmdBlock *block, uint8_
     return real_FSWriteFile(client, block, buffer, size, count, handle, unk1, errorMask);
 }
 
-DECL_FUNCTION(FSStatus, FSWriteFileAsync, FSClient *client, FSCmdBlock *block, uint8_t *buffer, uint32_t size, uint32_t count, FSFileHandle handle, uint32_t unk1, FSErrorFlag errorMask, FSAsyncData *asyncData) {
+DECL_FUNCTION(FSStatus, FSWriteFileAsync, FSClient *client, FSCmdBlock *block, uint8_t *buffer, uint32_t size, uint32_t count, FSFileHandle handle, uint32_t unk1, FSErrorFlag errorMask,
+              FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("");
     FSStatus result = FSWriteFileWrapper(buffer, size, count, handle, unk1, errorMask, ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {

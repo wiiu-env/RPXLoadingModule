@@ -12,7 +12,7 @@ public:
 
     explicit FileReaderCompressed(std::string &file);
 
-    ~FileReaderCompressed() override{
+    ~FileReaderCompressed() override {
         DEBUG_FUNCTION_LINE("");
     }
 

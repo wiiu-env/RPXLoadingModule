@@ -10,11 +10,12 @@ class FileReader {
 
 public:
     FileReader(uint8_t *buffer, uint32_t size);
+
     explicit FileReader(std::string &path);
 
     virtual ~FileReader();
 
-    virtual int read(uint8_t *buffer, uint32_t size) ;
+    virtual int read(uint8_t *buffer, uint32_t size);
 
 private:
     bool isReadFromBuffer = false;

@@ -25,7 +25,7 @@ int FileReader::read(uint8_t *buffer, uint32_t size) {
 }
 
 FileReader::FileReader(std::string &path) {
-    int fd = -1;
+    int fd;
     if ((fd = open(path.c_str(), O_RDONLY)) >= 0) {
         this->isReadFromFile = true;
         this->isReadFromBuffer = false;

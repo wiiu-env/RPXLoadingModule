@@ -245,8 +245,8 @@ int32_t RL_UnmountBundle(const char *name) {
     return romfsUnmount(name);
 }
 
-bool RL_UnmountCurrentRunningBundle(){
-    if(gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted == false){
+bool RL_UnmountCurrentRunningBundle() {
+    if (gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted == false) {
         return true;
     }
     if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {

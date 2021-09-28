@@ -13,7 +13,6 @@ public:
     explicit FileReaderCompressed(std::string &file);
 
     ~FileReaderCompressed() override {
-        DEBUG_FUNCTION_LINE("");
     }
 
     int read(uint8_t *buffer, uint32_t size) override;

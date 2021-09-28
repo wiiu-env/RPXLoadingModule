@@ -245,12 +245,28 @@ int32_t RL_UnmountBundle(const char *name) {
     return romfsUnmount(name);
 }
 
+bool RL_UnmountCurrentRunningBundle(){
+    if(gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted == false){
+        return true;
+    }
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {
+        if (gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) {
+            DEBUG_FUNCTION_LINE("Unmount /vol/content");
+            romfsUnmount("rom");
+            gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
+            DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+            return true;
+        }
+    }
+    return false;
+}
+
 int32_t RL_FileOpen(const char *name, uint32_t *handle) {
     if (handle == nullptr) {
         return -1;
     }
 
-    FileReader *reader = nullptr;
+    FileReader *reader;
     std::string path = std::string(name);
     std::string pathGZ = path + ".gz";
 
@@ -316,3 +332,4 @@ WUMS_EXPORT_FUNCTION(RL_FileClose);
 WUMS_EXPORT_FUNCTION(RL_FileExists);
 WUMS_EXPORT_FUNCTION(RL_RedirectContentWithFallback);
 WUMS_EXPORT_FUNCTION(RL_DisableContentRedirection);
+WUMS_EXPORT_FUNCTION(RL_UnmountCurrentRunningBundle);

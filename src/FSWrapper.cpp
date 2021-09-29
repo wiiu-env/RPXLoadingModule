@@ -519,7 +519,9 @@ static inline void replaceContentPath(char *pathForCheck, int pathForCheckSize, 
     int subStrLen = strlen(pathForCheck) - skipLen;
     if (subStrLen <= 0) {
         pathForCheck[0] = '\0';
-        strncat(pathForCheck, replaceWith, sizeof(pathForCheck) - 1);
+        if (strlen(replaceWith) + 1 <= pathForCheckSize) {
+            memcpy(pathForCheck, replaceWith, strlen(replaceWith) + 1);
+        }
     } else {
         char pathCopy[subStrLen + 1];
         pathCopy[0] = '\0';

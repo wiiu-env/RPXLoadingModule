@@ -73,11 +73,11 @@ int getNewFileHandleIndex() {
     return handle_id;
 }
 
-bool isValidDirHandle(int32_t handle) {
+bool isValidDirHandle(uint32_t handle) {
     return (handle & HANDLE_INDICATOR_MASK) == DIR_HANDLE_MAGIC;
 }
 
-bool isValidFileHandle(int32_t handle) {
+bool isValidFileHandle(uint32_t handle) {
     return (handle & HANDLE_INDICATOR_MASK) == FILE_HANDLE_MAGIC;
 }
 

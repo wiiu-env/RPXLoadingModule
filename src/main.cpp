@@ -46,6 +46,11 @@ WUMS_APPLICATION_ENDS() {
         }
     }
     gReplacementInfo.rpxReplacementInfo.isRPXReplaced = false;
+    if (gFSClient) {
+        FSDelClient(gFSClient, FS_ERROR_FLAG_ALL);
+        free(gFSClient);
+    }
+    free(gFSCmd);
 }
 
 WUMS_APPLICATION_STARTS() {
@@ -59,6 +64,23 @@ WUMS_APPLICATION_STARTS() {
     }
     WHBLogUdpInit();
     if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        auto fsClient = (FSClient *) memalign(0x20, sizeof(FSClient));
+        auto fsCmd = (FSCmdBlock *) memalign(0x20, sizeof(FSCmdBlock));
+
+        if (fsClient == nullptr || fsCmd == nullptr) {
+            DEBUG_FUNCTION_LINE("Failed to alloc memory for fsclient or fsCmd");
+            free(fsClient);
+            free(fsCmd);
+        } else {
+            auto rc = FSAddClient(fsClient, FS_ERROR_FLAG_ALL);
+            if (rc < 0) {
+                DEBUG_FUNCTION_LINE("Failed to add FSClient");
+            } else {
+                FSInitCmdBlock(fsCmd);
+                gFSClient = fsClient;
+                gFSCmd = fsCmd;
+            }
+        }
         return;
     }
 

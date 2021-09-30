@@ -1,5 +1,6 @@
 #include <wums.h>
 #include <coreinit/mutex.h>
+#include <coreinit/filesystem.h>
 
 typedef struct MetaInformation_t {
     char shortname[64];
@@ -49,3 +50,5 @@ typedef struct RPXLoader_ReplacementInformation_t {
 
 
 extern RPXLoader_ReplacementInformation gReplacementInfo;
+extern FSClient * gFSClient;
+extern FSCmdBlock * gFSCmd;

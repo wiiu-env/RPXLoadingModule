@@ -7,11 +7,18 @@
 #include <coreinit/mutex.h>
 
 typedef struct dirMagic {
-    uint32_t handle;
-    DIR *dir;
-    bool in_use;
-    char path[256];
-    OSMutex *mutex;
+    uint32_t handle{};
+    DIR *dir{};
+    bool in_use{};
+    char path[256]{};
+
+    OSMutex *mutex{};
+
+    FSDirectoryEntry * readResult = nullptr;
+    int readResultCapacity = 0;
+    int readResultNumberOfEntries = 0;
+
+    FSDirectoryHandle realDirHandle = 0;
 } dirMagic_t;
 
 typedef struct fileMagic {
@@ -21,6 +28,12 @@ typedef struct fileMagic {
     OSMutex *mutex;
 } fileMagic_t;
 
+
+#define ERROR_FLAG_MASK                     (0xFFFF0000)
+#define FORCE_REAL_FUNC_MAGIC               (0x42420000)
+#define FORCE_REAL_FUNC_WITH_FULL_ERRORS    (FORCE_REAL_FUNC_MAGIC | 0x0000FFFF)
+
+#define HANDLE_INDICATOR_MASK   0xFFFFFF00
 #define HANDLE_INDICATOR_MASK   0xFFFFFF00
 #define HANDLE_MASK             (0x000000FF)
 #define DIR_HANDLE_MAGIC        0x30000000

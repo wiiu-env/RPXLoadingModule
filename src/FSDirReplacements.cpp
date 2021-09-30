@@ -11,8 +11,8 @@
 }
 
 #define ASYNC_RESULT_HANDLER [client, block, asyncData](FSStatus res) -> FSStatus { \
-   DEBUG_FUNCTION_LINE_VERBOSE("Result was %d", res);                                                                 \
-    return send_result_async(client, block, asyncData, res);\
+   DEBUG_FUNCTION_LINE_VERBOSE("Result was %d", res); \
+   return send_result_async(client, block, asyncData, res); \
 }
 
 DECL_FUNCTION(FSStatus, FSOpenDir, FSClient *client, FSCmdBlock *block, char *path, FSDirectoryHandle *handle, FSErrorFlag errorMask) {
@@ -33,17 +33,24 @@ DECL_FUNCTION(FSStatus, FSOpenDir, FSClient *client, FSCmdBlock *block, char *pa
 
 DECL_FUNCTION(FSStatus, FSOpenDirAsync, FSClient *client, FSCmdBlock *block, char *path, FSDirectoryHandle *handle, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSOpenDirWrapper(path, handle, errorMask,
-                                       [client, block, handle, errorMask, asyncData]
-                                               (char *_path) -> FSStatus {
-                                           return real_FSOpenDirAsync(client, block, _path, handle, errorMask, asyncData);
-                                       },
-                                       ASYNC_RESULT_HANDLER);
-    if (result != FS_STATUS_USE_REAL_OS) {
-        return result;
+    FSErrorFlag realErrorMask = errorMask;
+
+    // Even real_FSOpenDir is still calling our FSOpenDirAsync hook. To bypass our code we use "FORCE_REAL_FUNC_WITH_FULL_ERRORS" as an errorMask.
+    if ((errorMask & ERROR_FLAG_MASK) != FORCE_REAL_FUNC_MAGIC) {
+        FSStatus result = FSOpenDirWrapper(path, handle, errorMask,
+                                           [client, block, handle, errorMask, asyncData]
+                                                   (char *_path) -> FSStatus {
+                                               return real_FSOpenDirAsync(client, block, _path, handle, errorMask, asyncData);
+                                           },
+                                           ASYNC_RESULT_HANDLER);
+        if (result != FS_STATUS_USE_REAL_OS) {
+            return result;
+        }
+    } else {
+        realErrorMask = FS_ERROR_FLAG_ALL;
     }
 
-    return real_FSOpenDirAsync(client, block, path, handle, errorMask, asyncData);
+    return real_FSOpenDirAsync(client, block, path, handle, realErrorMask, asyncData);
 }
 
 DECL_FUNCTION(FSStatus, FSReadDir, FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSDirectoryEntry *entry, FSErrorFlag errorMask) {
@@ -58,12 +65,18 @@ DECL_FUNCTION(FSStatus, FSReadDir, FSClient *client, FSCmdBlock *block, FSDirect
 
 DECL_FUNCTION(FSStatus, FSReadDirAsync, FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSDirectoryEntry *entry, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE();
-    FSStatus result = FSReadDirWrapper(handle, entry, errorMask, ASYNC_RESULT_HANDLER);
-    if (result != FS_STATUS_USE_REAL_OS) {
-        return result;
+    FSErrorFlag realErrorMask = errorMask;
+    // Even real_FSReadDir is still calling our FSReadDirAsync hook. To bypass our code we use "FORCE_REAL_FUNC_WITH_FULL_ERRORS" as an errorMask.
+    if ((errorMask & ERROR_FLAG_MASK) != FORCE_REAL_FUNC_MAGIC) {
+        FSStatus result = FSReadDirWrapper(handle, entry, errorMask, ASYNC_RESULT_HANDLER);
+        if (result != FS_STATUS_USE_REAL_OS) {
+            return result;
+        }
+    } else {
+        realErrorMask = FS_ERROR_FLAG_ALL;
     }
 
-    return real_FSReadDirAsync(client, block, handle, entry, errorMask, asyncData);
+    return real_FSReadDirAsync(client, block, handle, entry, realErrorMask, asyncData);
 }
 
 DECL_FUNCTION(FSStatus, FSCloseDir, FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSErrorFlag errorMask) {
@@ -78,12 +91,18 @@ DECL_FUNCTION(FSStatus, FSCloseDir, FSClient *client, FSCmdBlock *block, FSDirec
 
 DECL_FUNCTION(FSStatus, FSCloseDirAsync, FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE();
-    FSStatus result = FSCloseDirWrapper(handle, errorMask, ASYNC_RESULT_HANDLER);
-    if (result != FS_STATUS_USE_REAL_OS) {
-        return result;
+    FSErrorFlag realErrorMask = errorMask;
+    // Even real_FSCloseDir is still calling our FSCloseDirAsync hook. To bypass our code we use "FORCE_REAL_FUNC_WITH_FULL_ERRORS" as an errorMask.
+    if ((errorMask & ERROR_FLAG_MASK) != FORCE_REAL_FUNC_MAGIC) {
+        FSStatus result = FSCloseDirWrapper(handle, errorMask, ASYNC_RESULT_HANDLER);
+        if (result != FS_STATUS_USE_REAL_OS) {
+            return result;
+        }
+    } else {
+        realErrorMask = FS_ERROR_FLAG_ALL;
     }
 
-    return real_FSCloseDirAsync(client, block, handle, errorMask, asyncData);
+    return real_FSCloseDirAsync(client, block, handle, realErrorMask, asyncData);
 }
 
 DECL_FUNCTION(FSStatus, FSRewindDir, FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSErrorFlag errorMask) {
@@ -98,12 +117,18 @@ DECL_FUNCTION(FSStatus, FSRewindDir, FSClient *client, FSCmdBlock *block, FSDire
 
 DECL_FUNCTION(FSStatus, FSRewindDirAsync, FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE();
-    FSStatus result = FSRewindDirWrapper(handle, errorMask, ASYNC_RESULT_HANDLER);
-    if (result != FS_STATUS_USE_REAL_OS) {
-        return result;
+    FSErrorFlag realErrorMask = errorMask;
+    // Even real_FSRewindDir is still calling our FSRewindDirAsync hook. To bypass our code we use "FORCE_REAL_FUNC_WITH_FULL_ERRORS" as an errorMask.
+    if ((errorMask & ERROR_FLAG_MASK) != FORCE_REAL_FUNC_MAGIC) {
+        FSStatus result = FSRewindDirWrapper(handle, errorMask, ASYNC_RESULT_HANDLER);
+        if (result != FS_STATUS_USE_REAL_OS) {
+            return result;
+        }
+    } else {
+        realErrorMask = FS_ERROR_FLAG_ALL;
     }
 
-    return real_FSRewindDirAsync(client, block, handle, errorMask, asyncData);
+    return real_FSRewindDirAsync(client, block, handle, realErrorMask, asyncData);
 }
 
 DECL_FUNCTION(FSStatus, FSMakeDir, FSClient *client, FSCmdBlock *block, char *path, FSErrorFlag errorMask) {

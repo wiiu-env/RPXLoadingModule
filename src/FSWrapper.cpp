@@ -134,6 +134,8 @@ void freeDirHandle(uint32_t handle) {
     dir_handle_mutex.unlock();
 }
 
+extern "C" FSStatus (*real_FSOpenDir)(FSClient *, FSCmdBlock *, char *, FSDirectoryHandle *, FSErrorFlag);
+
 FSStatus FSOpenDirWrapper(char *path,
                           FSDirectoryHandle *handle,
                           FSErrorFlag errorMask,
@@ -177,10 +179,30 @@ FSStatus FSOpenDirWrapper(char *path,
                 dir_handles[handle_index].path[0] = '\0';
                 strncat(dir_handles[handle_index].path, pathForCheck, sizeof(dir_handles[handle_index].path) - 1);
 
-                DCFlushRange(&dir_handles[handle_index], sizeof(dirMagic_t));
+                if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+                    auto dir_info = &dir_handles[handle_index];
+
+                    dir_info->readResult = nullptr;
+                    dir_info->readResultCapacity = 0;
+                    dir_info->readResultNumberOfEntries = 0;
+
+                    dir_info->realDirHandle = 0;
+
+                    if (gFSClient && gFSCmd) {
+                        FSDirectoryHandle realHandle = 0;
+                        if (real_FSOpenDir(gFSClient, gFSCmd, path, &realHandle, (FSErrorFlag) FORCE_REAL_FUNC_WITH_FULL_ERRORS) == FS_STATUS_OK) {
+                            dir_info->realDirHandle = realHandle;
+                        } else {
+                            DEBUG_FUNCTION_LINE_VERBOSE("Failed to open real dir %s", path);
+                        }
+                    } else {
+                        DEBUG_FUNCTION_LINE("Global FSClient or FSCmdBlock were null");
+                    }
+                    DCFlushRange(dir_info, sizeof(dirMagic_t));
+                }
+
                 OSUnlockMutex(dir_handles[handle_index].mutex);
             } else {
-                DEBUG_FUNCTION_LINE("Dir not found %s", pathForCheck);
                 if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
                     return FS_STATUS_USE_REAL_OS;
                 }
@@ -197,6 +219,8 @@ FSStatus FSOpenDirWrapper(char *path,
     }
     return FS_STATUS_USE_REAL_OS;
 }
+
+extern "C" FSStatus (*real_FSReadDir)(FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSDirectoryEntry *entry, FSErrorFlag errorMask);
 
 FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
                           FSDirectoryEntry *entry,
@@ -217,6 +241,19 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
 
     OSLockMutex(dir_handles[handle_index].mutex);
     DIR *dir = dir_handles[handle_index].dir;
+
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        auto dir_info = &dir_handles[handle_index];
+
+        // Init list if needed
+        if (dir_info->readResultCapacity == 0) {
+            dir_info->readResult = (FSDirectoryEntry *) malloc(sizeof(FSDirectoryEntry));
+            if (dir_info->readResult != nullptr) {
+                dir_info->readResultCapacity = 1;
+            }
+        }
+        DCFlushRange(dir_info, sizeof(dirMagic_t));
+    }
 
     struct dirent *entry_ = readdir(dir);
     FSStatus result = FS_STATUS_END;
@@ -244,12 +281,72 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
                 }
             }
         }
+
+        if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+            auto dir_info = &dir_handles[handle_index];
+            if (dir_info->readResultNumberOfEntries >= dir_info->readResultCapacity) {
+                auto newCapacity = dir_info->readResultCapacity * 2;
+                dir_info->readResult = (FSDirectoryEntry *) realloc(dir_info->readResult, newCapacity * sizeof(FSDirectoryEntry));
+                dir_info->readResultCapacity = newCapacity;
+                if (dir_info->readResult == nullptr) {
+                    OSFatal("Failed to alloc memory for dir entry list");
+                }
+            }
+
+            memcpy(&dir_info->readResult[dir_info->readResultNumberOfEntries], entry, sizeof(FSDirectoryEntry));
+            dir_info->readResultNumberOfEntries++;
+
+            DCFlushRange(dir_info->readResult, sizeof(FSDirectoryEntry) * dir_info->readResultNumberOfEntries);
+            DCFlushRange(dir_info, sizeof(dirMagic_t));
+        }
+
         result = FS_STATUS_OK;
+    } else if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        auto dir_info = &dir_handles[handle_index];
+        // Read the real directory.
+        if (dir_info->realDirHandle != 0) {
+            if (gFSClient && gFSCmd) {
+                FSDirectoryEntry realDirEntry;
+                FSStatus readDirResult = FS_STATUS_OK;
+                result = FS_STATUS_END;
+                while (readDirResult == FS_STATUS_OK) {
+                    readDirResult = real_FSReadDir(gFSClient, gFSCmd, dir_info->realDirHandle, &realDirEntry, (FSErrorFlag) FORCE_REAL_FUNC_WITH_FULL_ERRORS);
+                    if (readDirResult == FS_STATUS_OK) {
+                        bool found = false;
+                        for (int i = 0; i < dir_info->readResultNumberOfEntries; i++) {
+                            auto curResult = &dir_info->readResult[i];
+                            // Check if this is a new result
+                            if (strncmp(curResult->name, realDirEntry.name, sizeof(realDirEntry.name) - 1) == 0) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        // If it's new we can use it :)
+                        if (!found) {
+                            memcpy(entry, &realDirEntry, sizeof(FSDirectoryEntry));
+                            result = FS_STATUS_OK;
+                            break;
+                        }
+                    } else if (readDirResult == FS_STATUS_END) {
+                        result = FS_STATUS_END;
+                        break;
+                    } else {
+                        DEBUG_FUNCTION_LINE("real_FSReadDir returned an unexpected error: %08X", readDirResult);
+                        result = FS_STATUS_END;
+                        break;
+                    }
+                }
+            } else {
+                DEBUG_FUNCTION_LINE("Global FSClient or FSCmdBlock were null");
+            }
+        }
     }
 
     OSUnlockMutex(dir_handles[handle_index].mutex);
     return result_handler(result);
 }
+
+extern "C" FSStatus (*real_FSCloseDir)(FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSErrorFlag errorMask);
 
 FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
                            FSErrorFlag errorMask,
@@ -274,10 +371,37 @@ FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
         result = FS_STATUS_MEDIA_ERROR;
     }
 
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        auto dir_info = &dir_handles[handle_index];
+
+        if (dir_info->realDirHandle != 0) {
+            if (gFSClient && gFSCmd) {
+                auto realResult = real_FSCloseDir(gFSClient, gFSCmd, dir_info->realDirHandle, (FSErrorFlag) FORCE_REAL_FUNC_WITH_FULL_ERRORS);
+                if (realResult == FS_STATUS_OK) {
+                    dir_info->realDirHandle = 0;
+                } else {
+                    DEBUG_FUNCTION_LINE("Failed to closed dir %d", realResult);
+                }
+            } else {
+                DEBUG_FUNCTION_LINE("Global FSClient or FSCmdBlock were null");
+            }
+        }
+
+        if (dir_info->readResult != nullptr) {
+            free(dir_info->readResult);
+            dir_info->readResult = nullptr;
+            dir_info->readResultCapacity = 0;
+            dir_info->readResultNumberOfEntries = 0;
+        }
+        DCFlushRange(dir_info, sizeof(dirMagic_t));
+    }
+
     OSUnlockMutex(dir_handles[handle_index].mutex);
     freeDirHandle(handle_index);
     return result_handler(result);
 }
+
+extern "C" FSStatus (*real_FSRewindDir)(FSClient *client, FSCmdBlock *block, FSDirectoryHandle handle, FSErrorFlag errorMask);
 
 FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
                             FSErrorFlag errorMask,
@@ -297,6 +421,29 @@ FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
 
     DIR *dir = dir_handles[real_handle].dir;
     rewinddir(dir);
+
+    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
+        auto dir_info = &dir_handles[handle_index];
+
+        if (dir_info->readResult != nullptr) {
+            dir_info->readResultNumberOfEntries = 0;
+            memset(dir_info->readResult, 0, sizeof(FSDirectoryEntry) * dir_info->readResultCapacity);
+        }
+
+        if (dir_info->realDirHandle != 0) {
+            if (gFSClient && gFSCmd) {
+                if (real_FSRewindDir(gFSClient, gFSCmd, dir_info->realDirHandle, (FSErrorFlag) FORCE_REAL_FUNC_WITH_FULL_ERRORS) == FS_STATUS_OK) {
+                    dir_info->realDirHandle = 0;
+                } else {
+                    DEBUG_FUNCTION_LINE("Failed to rewind dir");
+                }
+            } else {
+                DEBUG_FUNCTION_LINE("Global FSClient or FSCmdBlock were null");
+            }
+        }
+        DCFlushRange(dir_info, sizeof(dirMagic_t));
+    }
+
     OSUnlockMutex(dir_handles[handle_index].mutex);
     return result_handler(FS_STATUS_OK);
 }

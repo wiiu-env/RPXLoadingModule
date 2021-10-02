@@ -2,16 +2,10 @@
 #include "globals.h"
 
 #include <coreinit/dynload.h>
-#include <coreinit/cache.h>
-#include <wums.h>
 #include <cstring>
-#include <string>
 
-#include <coreinit/filesystem.h>
 #include "utils/logger.h"
 #include "FileUtils.h"
-#include "utils/utils.h"
-#include "utils/StringTools.h"
 #include "FSWrapper.h"
 
 #define SYNC_RESULT_HANDLER [](FSStatus res) -> FSStatus { \

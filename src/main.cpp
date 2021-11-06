@@ -1,5 +1,7 @@
 #include <wums.h>
 #include <cstring>
+#include <whb/log_cafe.h>
+#include <whb/log_module.h>
 #include <whb/log_udp.h>
 #include <coreinit/debug.h>
 #include <coreinit/title.h>
@@ -22,7 +24,10 @@ WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 WUMS_USE_WUT_DEVOPTAB();
 
 WUMS_INITIALIZE() {
-    WHBLogUdpInit();
+    if (!WHBLogModuleInit()) {
+        WHBLogCafeInit();
+        WHBLogUdpInit();
+    }
     DEBUG_FUNCTION_LINE("Patch functions");
     // we only patch static functions, we don't need re-patch them and every launch
     FunctionPatcherPatchFunction(fs_file_function_replacements, fs_file_function_replacements_size);
@@ -62,7 +67,10 @@ WUMS_APPLICATION_STARTS() {
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
         gReplacementInfo.rpxReplacementInfo.isRPXReplaced = true;
     }
-    WHBLogUdpInit();
+    if (!WHBLogModuleInit()) {
+        WHBLogCafeInit();
+        WHBLogUdpInit();
+    }
     if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
         auto fsClient = (FSClient *) memalign(0x20, sizeof(FSClient));
         auto fsCmd = (FSCmdBlock *) memalign(0x20, sizeof(FSCmdBlock));

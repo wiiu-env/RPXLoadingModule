@@ -52,7 +52,7 @@ FSStatus send_result_async(FSClient *client, FSCmdBlock *block, FSAsyncData *asy
         result->block = block;
         result->status = status;
 
-        while (!OSSendMessage(asyncData->ioMsgQueue, (OSMessage *) &(result->ioMsg), OS_MESSAGE_FLAGS_NONE)) {
+        while (!OSSendMessage(asyncData->ioMsgQueue, (OSMessage * ) & (result->ioMsg), OS_MESSAGE_FLAGS_NONE)) {
             DEBUG_FUNCTION_LINE("Failed to send message");
         }
     }

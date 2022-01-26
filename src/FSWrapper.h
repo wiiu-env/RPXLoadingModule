@@ -14,7 +14,7 @@ typedef struct dirMagic {
 
     OSMutex *mutex{};
 
-    FSDirectoryEntry * readResult = nullptr;
+    FSDirectoryEntry *readResult = nullptr;
     int readResultCapacity = 0;
     int readResultNumberOfEntries = 0;
 

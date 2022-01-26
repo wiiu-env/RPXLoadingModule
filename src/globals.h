@@ -50,5 +50,5 @@ typedef struct RPXLoader_ReplacementInformation_t {
 
 
 extern RPXLoader_ReplacementInformation gReplacementInfo;
-extern FSClient * gFSClient;
-extern FSCmdBlock * gFSCmd;
+extern FSClient *gFSClient;
+extern FSCmdBlock *gFSCmd;

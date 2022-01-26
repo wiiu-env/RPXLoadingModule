@@ -1,8 +1,6 @@
 #include <wums.h>
 #include <cstring>
-#include <whb/log_cafe.h>
-#include <whb/log_module.h>
-#include <whb/log_udp.h>
+
 #include <coreinit/debug.h>
 #include <coreinit/title.h>
 #include <sysapp/title.h>
@@ -20,14 +18,11 @@
 #include <nn/act.h>
 
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
-
 WUMS_USE_WUT_DEVOPTAB();
 
+
 WUMS_INITIALIZE() {
-    if (!WHBLogModuleInit()) {
-        WHBLogCafeInit();
-        WHBLogUdpInit();
-    }
+    initLogging();
     DEBUG_FUNCTION_LINE("Patch functions");
     // we only patch static functions, we don't need re-patch them and every launch
     FunctionPatcherPatchFunction(fs_file_function_replacements, fs_file_function_replacements_size);
@@ -35,6 +30,8 @@ WUMS_INITIALIZE() {
     FunctionPatcherPatchFunction(rpx_utils_function_replacements, rpx_utils_function_replacements_size);
     DEBUG_FUNCTION_LINE("Patch functions finished");
     gReplacementInfo = {};
+
+    deinitLogging();
 }
 
 
@@ -56,6 +53,8 @@ WUMS_APPLICATION_ENDS() {
         free(gFSClient);
     }
     free(gFSCmd);
+
+    deinitLogging();
 }
 
 WUMS_APPLICATION_STARTS() {
@@ -63,14 +62,12 @@ WUMS_APPLICATION_STARTS() {
     if (upid != 2 && upid != 15) {
         return;
     }
+    initLogging();
     if (gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced) {
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
         gReplacementInfo.rpxReplacementInfo.isRPXReplaced = true;
     }
-    if (!WHBLogModuleInit()) {
-        WHBLogCafeInit();
-        WHBLogUdpInit();
-    }
+
     if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
         auto fsClient = (FSClient *) memalign(0x20, sizeof(FSClient));
         auto fsCmd = (FSCmdBlock *) memalign(0x20, sizeof(FSCmdBlock));

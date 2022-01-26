@@ -29,7 +29,7 @@ INCLUDES	:=	src
 #-------------------------------------------------------------------------------
 # options for code generation
 #-------------------------------------------------------------------------------
-CFLAGS	:=	-g -Wall -Wextra -O2 -ffunction-sections\
+CFLAGS	:=	-Wall -Wextra -Os -ffunction-sections\
 			$(MACHDEP)
 
 CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__
@@ -38,6 +38,11 @@ CXXFLAGS	:= $(CFLAGS) -std=c++17
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map) -T$(WUMS_ROOT)/share/libfunctionpatcher.ld $(WUMSSPECS) 
+
+ifeq ($(DEBUG),1)
+CXXFLAGS += -DDEBUG -g
+CCFLAGS += -DDEBUG -g
+endif
 
 LIBS	:= -lwums -lwut -lfunctionpatcher -lromfs -lz
 

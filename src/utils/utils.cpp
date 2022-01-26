@@ -1,9 +1,5 @@
 #include <string.h>
-#include <stddef.h>
 #include <whb/log.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <coreinit/debug.h>
 #include "utils/logger.h"
 
 #define PRINTF_BUFFER_LENGTH 2048
@@ -40,30 +36,4 @@ void dumpHex(const void *data, size_t size) {
             }
         }
     }
-}
-
-BOOL OSFatal_printf(const char *fmt, ...) {
-    char *buf1 = (char *) memalign(4, PRINTF_BUFFER_LENGTH);
-    char *buf2 = (char *) memalign(4, PRINTF_BUFFER_LENGTH);
-    va_list va;
-
-    if (!buf1) {
-        return FALSE;
-    }
-
-    if (!buf2) {
-        free(buf1);
-        return FALSE;
-    }
-
-    va_start(va, fmt);
-
-    vsnprintf(buf1, PRINTF_BUFFER_LENGTH, fmt, va);
-    snprintf(buf2, PRINTF_BUFFER_LENGTH, "%s\n", buf1);
-    OSFatal(buf2);
-
-    free(buf1);
-    free(buf2);
-    va_end(va);
-    return TRUE;
 }

@@ -488,7 +488,7 @@ FSStatus FSOpenFileWrapper(char *path,
         return FS_STATUS_USE_REAL_OS;
     }
     if (path == nullptr) {
-        OSFATAL_FUNCTION_LINE("Invalid args");
+        OSFatal("Invalid args");
         return FS_STATUS_FATAL_ERROR;
     }
 
@@ -610,7 +610,7 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
         return FS_STATUS_USE_REAL_OS;
     }
     if (path == nullptr) {
-        OSFATAL_FUNCTION_LINE("Invalid args");
+        OSFatal("Invalid args");
         return FS_STATUS_FATAL_ERROR;
     }
 
@@ -949,7 +949,7 @@ FSStatus FSRemoveWrapper(char *path,
     }
 
     if (path == nullptr) {
-        OSFATAL_FUNCTION_LINE("Invalid args");
+        OSFatal("Invalid args");
         return FS_STATUS_USE_REAL_OS;
     }
 

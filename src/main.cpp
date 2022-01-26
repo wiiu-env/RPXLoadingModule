@@ -1,5 +1,6 @@
 #include <wums.h>
 #include <cstring>
+#include <malloc.h>
 
 #include <coreinit/debug.h>
 #include <coreinit/title.h>

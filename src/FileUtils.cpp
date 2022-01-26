@@ -39,6 +39,7 @@ FSStatus send_result_async(FSClient *client, FSCmdBlock *block, FSAsyncData *asy
     }
 
     if (asyncData->ioMsgQueue != nullptr) {
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
         FSAsyncResult *result = &(fsCmdBlockGetBody(block)->asyncResult);
         //DEBUG_FUNCTION_LINE("Send result %d to ioMsgQueue (%08X)", status, asyncData->ioMsgQueue);
         result->asyncData.callback = asyncData->callback;
@@ -68,12 +69,11 @@ int32_t readIntoBuffer(int32_t handle, void *buffer, size_t size, size_t count) 
     void *newBuffer = buffer;
     int32_t curResult = -1;
     int32_t totalSize = 0;
-    int32_t toRead = 0;
+    // int32_t toRead = 0;
     while (sizeToRead > 0) {
         curResult = read(handle, newBuffer, sizeToRead);
         if (curResult < 0) {
-            int errsv = errno;
-            DEBUG_FUNCTION_LINE("Error: Reading %08X bytes from handle %08X. result %08X errno: %d ", size * count, handle, curResult, errsv);
+            DEBUG_FUNCTION_LINE("Error: Reading %08X bytes from handle %08X. result %08X errno: %d ", size * count, handle, curResult, errno);
             return -1;
         }
         if (curResult == 0) {

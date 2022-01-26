@@ -15,9 +15,7 @@
 #include "utils/ini.h"
 #include <cstring>
 #include <rpxloader.h>
-#include <sys/types.h>
 #include <dirent.h>
-
 
 /*
  * Patch the meta xml for the home menu
@@ -226,7 +224,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
             gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath[0] = '\0';
             strncat(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath,
                     gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath,
-                    sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) - 1);
+                    sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) - 2);
         } else {
             gReplacementInfo.contentReplacementInfo.replaceSave = false;
         }

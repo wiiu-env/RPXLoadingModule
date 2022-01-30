@@ -22,7 +22,7 @@ void dumpHex(const void *data, size_t size) {
             if ((i + 1) % 16 == 0) {
                 WHBLogPrintf("|  %s ", ascii);
                 if (i + 1 < size) {
-                    DEBUG_FUNCTION_LINE("0x%08X (0x%04X); ", data + i + 1, i + 1);
+                    DEBUG_FUNCTION_LINE("0x%08X (0x%04X); ", ((char*)data)[i + 1], i + 1);
                 }
             } else if (i + 1 == size) {
                 ascii[(i + 1) % 16] = '\0';

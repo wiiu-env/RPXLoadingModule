@@ -1,14 +1,13 @@
 #pragma once
 
-#include <string>
 #include <coreinit/filesystem.h>
 #include <romfs_dev.h>
+#include <string>
 
-struct WUT_PACKED FSCmdBlockBody {//! FSAsyncResult object used for this command.
+struct WUT_PACKED FSCmdBlockBody { //! FSAsyncResult object used for this command.
 
     WUT_UNKNOWN_BYTES(0x96C);
     FSAsyncResult asyncResult;
-
 };
 WUT_CHECK_OFFSET(FSCmdBlockBody, 0x96C, asyncResult);
 WUT_CHECK_SIZE(FSCmdBlockBody, 0x96C + 0x28);

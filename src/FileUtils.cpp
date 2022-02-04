@@ -1,18 +1,18 @@
 #include "FileUtils.h"
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <mutex>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
+#include "utils/StringTools.h"
+#include "utils/logger.h"
+#include "utils/utils.h"
+#include <coreinit/cache.h>
 #include <coreinit/debug.h>
-#include <map>
 #include <coreinit/thread.h>
 #include <dirent.h>
-#include <coreinit/cache.h>
-#include "utils/StringTools.h"
-#include "utils/utils.h"
-#include "utils/logger.h"
+#include <map>
 
 extern "C" OSMessageQueue *OSGetDefaultAppIOQueue();
 
@@ -42,17 +42,17 @@ FSStatus send_result_async(FSClient *client, FSCmdBlock *block, FSAsyncData *asy
 #pragma GCC diagnostic ignored "-Waddress-of-packed-member"
         FSAsyncResult *result = &(fsCmdBlockGetBody(block)->asyncResult);
         //DEBUG_FUNCTION_LINE("Send result %d to ioMsgQueue (%08X)", status, asyncData->ioMsgQueue);
-        result->asyncData.callback = asyncData->callback;
-        result->asyncData.param = asyncData->param;
+        result->asyncData.callback   = asyncData->callback;
+        result->asyncData.param      = asyncData->param;
         result->asyncData.ioMsgQueue = asyncData->ioMsgQueue;
         memset(&result->ioMsg, 0, sizeof(result->ioMsg));
         result->ioMsg.data = result;
         result->ioMsg.type = OS_FUNCTION_TYPE_FS_CMD_ASYNC;
-        result->client = client;
-        result->block = block;
-        result->status = status;
+        result->client     = client;
+        result->block      = block;
+        result->status     = status;
 
-        while (!OSSendMessage(asyncData->ioMsgQueue, (OSMessage * ) & (result->ioMsg), OS_MESSAGE_FLAGS_NONE)) {
+        while (!OSSendMessage(asyncData->ioMsgQueue, (OSMessage *) &(result->ioMsg), OS_MESSAGE_FLAGS_NONE)) {
             DEBUG_FUNCTION_LINE("Failed to send message");
         }
     }
@@ -66,7 +66,7 @@ int32_t readIntoBuffer(int32_t handle, void *buffer, size_t size, size_t count) 
     if (sizeToRead > 0x100000) {
         sizeToRead = 0x100000;
     }*/
-    void *newBuffer = buffer;
+    void *newBuffer   = buffer;
     int32_t curResult = -1;
     int32_t totalSize = 0;
     // int32_t toRead = 0;
@@ -96,7 +96,7 @@ int32_t CheckFile(const char *filepath) {
         return 0;
     }
 
-    struct stat filestat{};
+    struct stat filestat {};
 
     char dirnoslash[strlen(filepath) + 2];
     snprintf(dirnoslash, sizeof(dirnoslash), "%s", filepath);
@@ -142,7 +142,7 @@ int32_t CreateSubfolder(const char *fullpath) {
         if (!ptr) {
             //!Device root directory (must be with '/')
             strcat(parentpath, "/");
-            struct stat filestat{};
+            struct stat filestat {};
             if (stat(parentpath, &filestat) == 0) {
                 return 1;
             }
@@ -180,12 +180,12 @@ int32_t getRPXInfoForPath(const std::string &path, romfs_fileInfo *info) {
         return -2;
     }
     bool found = false;
-    int res = -3;
+    int res    = -3;
     while ((entry = readdir(dir)) != nullptr) {
         if (StringTools::EndsWith(entry->d_name, ".rpx")) {
             if (romfsGetFileInfoPerPath("rcc", (std::string("code/") + entry->d_name).c_str(), info) >= 0) {
                 found = true;
-                res = 0;
+                res   = 0;
             } else {
                 DEBUG_FUNCTION_LINE("Failed to get info for %s", entry->d_name);
             }

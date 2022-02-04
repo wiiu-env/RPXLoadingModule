@@ -1,10 +1,10 @@
 #pragma once
 
+#include <coreinit/filesystem.h>
+#include <coreinit/mutex.h>
 #include <cstdint>
 #include <dirent.h>
 #include <functional>
-#include <coreinit/filesystem.h>
-#include <coreinit/mutex.h>
 
 typedef struct dirMagic {
     uint32_t handle{};
@@ -14,8 +14,8 @@ typedef struct dirMagic {
 
     OSMutex *mutex{};
 
-    FSDirectoryEntry *readResult = nullptr;
-    int readResultCapacity = 0;
+    FSDirectoryEntry *readResult  = nullptr;
+    int readResultCapacity        = 0;
     int readResultNumberOfEntries = 0;
 
     FSDirectoryHandle realDirHandle = 0;
@@ -29,20 +29,20 @@ typedef struct fileMagic {
 } fileMagic_t;
 
 
-#define ERROR_FLAG_MASK                     (0xFFFF0000)
-#define FORCE_REAL_FUNC_MAGIC               (0x42420000)
-#define FORCE_REAL_FUNC_WITH_FULL_ERRORS    (FORCE_REAL_FUNC_MAGIC | 0x0000FFFF)
+#define ERROR_FLAG_MASK                  (0xFFFF0000)
+#define FORCE_REAL_FUNC_MAGIC            (0x42420000)
+#define FORCE_REAL_FUNC_WITH_FULL_ERRORS (FORCE_REAL_FUNC_MAGIC | 0x0000FFFF)
 
-#define HANDLE_INDICATOR_MASK   0xFFFFFF00
-#define HANDLE_INDICATOR_MASK   0xFFFFFF00
-#define HANDLE_MASK             (0x000000FF)
-#define DIR_HANDLE_MAGIC        0x30000000
-#define FILE_HANDLE_MAGIC       0x30000100
+#define HANDLE_INDICATOR_MASK            0xFFFFFF00
+#define HANDLE_INDICATOR_MASK            0xFFFFFF00
+#define HANDLE_MASK                      (0x000000FF)
+#define DIR_HANDLE_MAGIC                 0x30000000
+#define FILE_HANDLE_MAGIC                0x30000100
 
-#define FILE_HANDLES_LENGTH     64
-#define DIR_HANDLES_LENGTH      64
+#define FILE_HANDLES_LENGTH              64
+#define DIR_HANDLES_LENGTH               64
 
-#define FS_STATUS_USE_REAL_OS   (FSStatus) 0xFFFF0000
+#define FS_STATUS_USE_REAL_OS            (FSStatus) 0xFFFF0000
 
 extern dirMagic_t dir_handles[DIR_HANDLES_LENGTH];
 extern fileMagic_t file_handles[FILE_HANDLES_LENGTH];

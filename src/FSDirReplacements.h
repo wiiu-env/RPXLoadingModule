@@ -13,4 +13,3 @@ extern uint32_t fs_dir_function_replacements_size;
 #ifdef __cplusplus
 }
 #endif
-

@@ -4,26 +4,26 @@
 #include <coreinit/dynload.h>
 #include <cstring>
 
-#include "utils/logger.h"
-#include "FileUtils.h"
 #include "FSWrapper.h"
+#include "FileUtils.h"
+#include "utils/logger.h"
 
 #define SYNC_RESULT_HANDLER [](FSStatus res) -> FSStatus { \
-    return res; \
+    return res;                                            \
 }
 
 #define ASYNC_RESULT_HANDLER [client, block, asyncData](FSStatus res) -> FSStatus { \
-    return send_result_async(client, block, asyncData, res);\
+    return send_result_async(client, block, asyncData, res);                        \
 }
 
 DECL_FUNCTION(FSStatus, FSOpenFile, FSClient *client, FSCmdBlock *block, char *path, const char *mode, FSFileHandle *handle, FSErrorFlag errorMask) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSOpenFileWrapper(path, mode, handle, errorMask,
-                                        [client, block, mode, handle, errorMask]
-                                                (char *_path) -> FSStatus {
-                                            return real_FSOpenFile(client, block, _path, mode, handle, errorMask);
-                                        },
-                                        SYNC_RESULT_HANDLER);
+    FSStatus result = FSOpenFileWrapper(
+            path, mode, handle, errorMask,
+            [client, block, mode, handle, errorMask](char *_path) -> FSStatus {
+                return real_FSOpenFile(client, block, _path, mode, handle, errorMask);
+            },
+            SYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -34,12 +34,12 @@ DECL_FUNCTION(FSStatus, FSOpenFile, FSClient *client, FSCmdBlock *block, char *p
 
 DECL_FUNCTION(FSStatus, FSOpenFileAsync, FSClient *client, FSCmdBlock *block, char *path, const char *mode, FSFileHandle *handle, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSOpenFileWrapper(path, mode, handle, errorMask,
-                                        [client, block, mode, handle, errorMask, asyncData]
-                                                (char *_path) -> FSStatus {
-                                            return real_FSOpenFileAsync(client, block, _path, mode, handle, errorMask, asyncData);
-                                        },
-                                        ASYNC_RESULT_HANDLER);
+    FSStatus result = FSOpenFileWrapper(
+            path, mode, handle, errorMask,
+            [client, block, mode, handle, errorMask, asyncData](char *_path) -> FSStatus {
+                return real_FSOpenFileAsync(client, block, _path, mode, handle, errorMask, asyncData);
+            },
+            ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -70,11 +70,12 @@ DECL_FUNCTION(FSStatus, FSCloseFileAsync, FSClient *client, FSCmdBlock *block, F
 
 DECL_FUNCTION(FSStatus, FSGetStat, FSClient *client, FSCmdBlock *block, char *path, FSStat *stats, FSErrorFlag errorMask) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSGetStatWrapper(path, stats, errorMask,
-                                       [client, block, stats, errorMask](char *_path) -> FSStatus {
-                                           return real_FSGetStat(client, block, _path, stats, errorMask);
-                                       },
-                                       SYNC_RESULT_HANDLER);
+    FSStatus result = FSGetStatWrapper(
+            path, stats, errorMask,
+            [client, block, stats, errorMask](char *_path) -> FSStatus {
+                return real_FSGetStat(client, block, _path, stats, errorMask);
+            },
+            SYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -83,11 +84,12 @@ DECL_FUNCTION(FSStatus, FSGetStat, FSClient *client, FSCmdBlock *block, char *pa
 
 DECL_FUNCTION(FSStatus, FSGetStatAsync, FSClient *client, FSCmdBlock *block, char *path, FSStat *stats, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSGetStatWrapper(path, stats, errorMask,
-                                       [client, block, stats, errorMask, asyncData](char *_path) -> FSStatus {
-                                           return real_FSGetStatAsync(client, block, _path, stats, errorMask, asyncData);
-                                       },
-                                       ASYNC_RESULT_HANDLER);
+    FSStatus result = FSGetStatWrapper(
+            path, stats, errorMask,
+            [client, block, stats, errorMask, asyncData](char *_path) -> FSStatus {
+                return real_FSGetStatAsync(client, block, _path, stats, errorMask, asyncData);
+            },
+            ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -257,11 +259,12 @@ DECL_FUNCTION(FSStatus, FSTruncateFileAsync, FSClient *client, FSCmdBlock *block
 
 DECL_FUNCTION(FSStatus, FSRemove, FSClient *client, FSCmdBlock *block, char *path, FSErrorFlag errorMask) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSRemoveWrapper(path, errorMask,
-                                      [client, block, errorMask](char *_path) -> FSStatus {
-                                          return real_FSRemove(client, block, _path, errorMask);
-                                      },
-                                      SYNC_RESULT_HANDLER);
+    FSStatus result = FSRemoveWrapper(
+            path, errorMask,
+            [client, block, errorMask](char *_path) -> FSStatus {
+                return real_FSRemove(client, block, _path, errorMask);
+            },
+            SYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -271,11 +274,12 @@ DECL_FUNCTION(FSStatus, FSRemove, FSClient *client, FSCmdBlock *block, char *pat
 
 DECL_FUNCTION(FSStatus, FSRemoveAsync, FSClient *client, FSCmdBlock *block, char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSRemoveWrapper(path, errorMask,
-                                      [client, block, errorMask, asyncData](char *_path) -> FSStatus {
-                                          return real_FSRemoveAsync(client, block, _path, errorMask, asyncData);
-                                      },
-                                      ASYNC_RESULT_HANDLER);
+    FSStatus result = FSRemoveWrapper(
+            path, errorMask,
+            [client, block, errorMask, asyncData](char *_path) -> FSStatus {
+                return real_FSRemoveAsync(client, block, _path, errorMask, asyncData);
+            },
+            ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -285,11 +289,12 @@ DECL_FUNCTION(FSStatus, FSRemoveAsync, FSClient *client, FSCmdBlock *block, char
 
 DECL_FUNCTION(FSStatus, FSRename, FSClient *client, FSCmdBlock *block, char *oldPath, char *newPath, FSErrorFlag errorMask) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s %s", oldPath, newPath);
-    FSStatus result = FSRenameWrapper(oldPath, newPath, errorMask,
-                                      [client, block, errorMask](char *_oldOath, char *_newPath) -> FSStatus {
-                                          return real_FSRename(client, block, _oldOath, _newPath, errorMask);
-                                      },
-                                      SYNC_RESULT_HANDLER);
+    FSStatus result = FSRenameWrapper(
+            oldPath, newPath, errorMask,
+            [client, block, errorMask](char *_oldOath, char *_newPath) -> FSStatus {
+                return real_FSRename(client, block, _oldOath, _newPath, errorMask);
+            },
+            SYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -299,11 +304,12 @@ DECL_FUNCTION(FSStatus, FSRename, FSClient *client, FSCmdBlock *block, char *old
 
 DECL_FUNCTION(FSStatus, FSRenameAsync, FSClient *client, FSCmdBlock *block, char *oldPath, char *newPath, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s %s", oldPath, newPath);
-    FSStatus result = FSRenameWrapper(oldPath, newPath, errorMask,
-                                      [client, block, errorMask, asyncData](char *_oldOath, char *_newPath) -> FSStatus {
-                                          return real_FSRenameAsync(client, block, _oldOath, _newPath, errorMask, asyncData);
-                                      },
-                                      ASYNC_RESULT_HANDLER);
+    FSStatus result = FSRenameWrapper(
+            oldPath, newPath, errorMask,
+            [client, block, errorMask, asyncData](char *_oldOath, char *_newPath) -> FSStatus {
+                return real_FSRenameAsync(client, block, _oldOath, _newPath, errorMask, asyncData);
+            },
+            ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }

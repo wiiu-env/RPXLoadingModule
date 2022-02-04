@@ -1,28 +1,28 @@
 #include "FSDirReplacements.h"
-#include <coreinit/filesystem.h>
-#include <coreinit/cache.h>
-#include "utils/logger.h"
-#include "globals.h"
 #include "FSWrapper.h"
 #include "FileUtils.h"
+#include "globals.h"
+#include "utils/logger.h"
+#include <coreinit/cache.h>
+#include <coreinit/filesystem.h>
 
 #define SYNC_RESULT_HANDLER [](FSStatus res) -> FSStatus { \
-    return res; \
+    return res;                                            \
 }
 
 #define ASYNC_RESULT_HANDLER [client, block, asyncData](FSStatus res) -> FSStatus { \
-   DEBUG_FUNCTION_LINE_VERBOSE("Result was %d", res); \
-   return send_result_async(client, block, asyncData, res); \
+    DEBUG_FUNCTION_LINE_VERBOSE("Result was %d", res);                              \
+    return send_result_async(client, block, asyncData, res);                        \
 }
 
 DECL_FUNCTION(FSStatus, FSOpenDir, FSClient *client, FSCmdBlock *block, char *path, FSDirectoryHandle *handle, FSErrorFlag errorMask) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSOpenDirWrapper(path, handle, errorMask,
-                                       [client, block, handle, errorMask]
-                                               (char *_path) -> FSStatus {
-                                           return real_FSOpenDir(client, block, _path, handle, errorMask);
-                                       },
-                                       SYNC_RESULT_HANDLER);
+    FSStatus result = FSOpenDirWrapper(
+            path, handle, errorMask,
+            [client, block, handle, errorMask](char *_path) -> FSStatus {
+                return real_FSOpenDir(client, block, _path, handle, errorMask);
+            },
+            SYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         DEBUG_FUNCTION_LINE_VERBOSE("Result was %d", result);
         return result;
@@ -37,12 +37,12 @@ DECL_FUNCTION(FSStatus, FSOpenDirAsync, FSClient *client, FSCmdBlock *block, cha
 
     // Even real_FSOpenDir is still calling our FSOpenDirAsync hook. To bypass our code we use "FORCE_REAL_FUNC_WITH_FULL_ERRORS" as an errorMask.
     if ((errorMask & ERROR_FLAG_MASK) != FORCE_REAL_FUNC_MAGIC) {
-        FSStatus result = FSOpenDirWrapper(path, handle, errorMask,
-                                           [client, block, handle, errorMask, asyncData]
-                                                   (char *_path) -> FSStatus {
-                                               return real_FSOpenDirAsync(client, block, _path, handle, errorMask, asyncData);
-                                           },
-                                           ASYNC_RESULT_HANDLER);
+        FSStatus result = FSOpenDirWrapper(
+                path, handle, errorMask,
+                [client, block, handle, errorMask, asyncData](char *_path) -> FSStatus {
+                    return real_FSOpenDirAsync(client, block, _path, handle, errorMask, asyncData);
+                },
+                ASYNC_RESULT_HANDLER);
         if (result != FS_STATUS_USE_REAL_OS) {
             return result;
         }
@@ -133,12 +133,12 @@ DECL_FUNCTION(FSStatus, FSRewindDirAsync, FSClient *client, FSCmdBlock *block, F
 
 DECL_FUNCTION(FSStatus, FSMakeDir, FSClient *client, FSCmdBlock *block, char *path, FSErrorFlag errorMask) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSMakeDirWrapper(path, errorMask,
-                                       [client, block, errorMask]
-                                               (char *_path) -> FSStatus {
-                                           return real_FSMakeDir(client, block, _path, errorMask);
-                                       },
-                                       SYNC_RESULT_HANDLER);
+    FSStatus result = FSMakeDirWrapper(
+            path, errorMask,
+            [client, block, errorMask](char *_path) -> FSStatus {
+                return real_FSMakeDir(client, block, _path, errorMask);
+            },
+            SYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -148,12 +148,12 @@ DECL_FUNCTION(FSStatus, FSMakeDir, FSClient *client, FSCmdBlock *block, char *pa
 
 DECL_FUNCTION(FSStatus, FSMakeDirAsync, FSClient *client, FSCmdBlock *block, char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("%s", path);
-    FSStatus result = FSMakeDirWrapper(path, errorMask,
-                                       [client, block, errorMask, asyncData]
-                                               (char *_path) -> FSStatus {
-                                           return real_FSMakeDirAsync(client, block, _path, errorMask, asyncData);
-                                       },
-                                       ASYNC_RESULT_HANDLER);
+    FSStatus result = FSMakeDirWrapper(
+            path, errorMask,
+            [client, block, errorMask, asyncData](char *_path) -> FSStatus {
+                return real_FSMakeDirAsync(client, block, _path, errorMask, asyncData);
+            },
+            ASYNC_RESULT_HANDLER);
     if (result != FS_STATUS_USE_REAL_OS) {
         return result;
     }
@@ -163,10 +163,10 @@ DECL_FUNCTION(FSStatus, FSMakeDirAsync, FSClient *client, FSCmdBlock *block, cha
 DECL_FUNCTION(FSStatus, FSChangeDirAsync, FSClient *client, FSCmdBlock *block, const char *path, FSErrorFlag errorMask, FSAsyncData *asyncData) {
     DEBUG_FUNCTION_LINE_VERBOSE("FSChangeDirAsync %s", path);
     snprintf(gReplacementInfo.contentReplacementInfo.workingDir, sizeof(gReplacementInfo.contentReplacementInfo.workingDir), "%s", path);
-    int len = strlen(gReplacementInfo.contentReplacementInfo.workingDir);
+    auto len = strlen(gReplacementInfo.contentReplacementInfo.workingDir);
     if (len > 0 && gReplacementInfo.contentReplacementInfo.workingDir[len - 1] != '/') {
         gReplacementInfo.contentReplacementInfo.workingDir[len - 1] = '/';
-        gReplacementInfo.contentReplacementInfo.workingDir[len] = 0;
+        gReplacementInfo.contentReplacementInfo.workingDir[len]     = 0;
     }
     DCFlushRange(gReplacementInfo.contentReplacementInfo.workingDir, sizeof(gReplacementInfo.contentReplacementInfo.workingDir));
     return real_FSChangeDirAsync(client, block, path, errorMask, asyncData);

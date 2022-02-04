@@ -1,6 +1,6 @@
+#include "utils/logger.h"
 #include <string.h>
 #include <whb/log.h>
-#include "utils/logger.h"
 
 #define PRINTF_BUFFER_LENGTH 2048
 

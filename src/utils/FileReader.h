@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 class FileReader {
 
@@ -20,9 +20,9 @@ public:
 private:
     bool isReadFromBuffer = false;
     uint8_t *input_buffer = nullptr;
-    uint32_t input_size = 0;
-    uint32_t input_pos = 0;
+    uint32_t input_size   = 0;
+    uint32_t input_pos    = 0;
 
     bool isReadFromFile = false;
-    int file_fd = 0;
+    int file_fd         = 0;
 };

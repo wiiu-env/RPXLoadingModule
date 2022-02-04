@@ -1,15 +1,15 @@
 #include "FSWrapper.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <cstring>
-#include <mutex>
-#include <coreinit/cache.h>
-#include <coreinit/debug.h>
-#include "utils/logger.h"
 #include "FileUtils.h"
 #include "globals.h"
+#include "utils/logger.h"
+#include <coreinit/cache.h>
+#include <coreinit/debug.h>
+#include <cstring>
+#include <fcntl.h>
+#include <mutex>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 dirMagic_t dir_handles[DIR_HANDLES_LENGTH];
 fileMagic_t file_handles[FILE_HANDLES_LENGTH];
@@ -59,10 +59,10 @@ int getNewFileHandleIndex() {
             handle_id = i;
             if (!file_handles[i].mutex) {
                 file_handles[i].mutex = (OSMutex *) malloc(sizeof(OSMutex));
-                OSInitMutex(file_handles[i].mutex);
                 if (!file_handles[i].mutex) {
                     OSFatal("Failed to alloc memory for mutex");
                 }
+                OSInitMutex(file_handles[i].mutex);
                 DCFlushRange(file_handles[i].mutex, sizeof(OSMutex));
                 DCFlushRange(&file_handles[i], sizeof(fileMagic_t));
             }
@@ -172,8 +172,8 @@ FSStatus FSOpenDirWrapper(char *path,
             if ((dir = opendir(pathForCheck))) {
                 OSLockMutex(dir_handles[handle_index].mutex);
                 dir_handles[handle_index].handle = DIR_HANDLE_MAGIC | handle_index;
-                *handle = dir_handles[handle_index].handle;
-                dir_handles[handle_index].dir = dir;
+                *handle                          = dir_handles[handle_index].handle;
+                dir_handles[handle_index].dir    = dir;
                 dir_handles[handle_index].in_use = true;
 
                 dir_handles[handle_index].path[0] = '\0';
@@ -182,8 +182,8 @@ FSStatus FSOpenDirWrapper(char *path,
                 if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
                     auto dir_info = &dir_handles[handle_index];
 
-                    dir_info->readResult = nullptr;
-                    dir_info->readResultCapacity = 0;
+                    dir_info->readResult                = nullptr;
+                    dir_info->readResultCapacity        = 0;
                     dir_info->readResultNumberOfEntries = 0;
 
                     dir_info->realDirHandle = 0;
@@ -256,25 +256,25 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
     }
 
     struct dirent *entry_ = readdir(dir);
-    FSStatus result = FS_STATUS_END;
+    FSStatus result       = FS_STATUS_END;
     if (entry_) {
         entry->name[0] = '\0';
         strncat(entry->name, entry_->d_name, sizeof(entry->name) - 1);
         entry->info.mode = (FSMode) FS_MODE_READ_OWNER;
         if (entry_->d_type == DT_DIR) {
             entry->info.flags = (FSStatFlags) ((uint32_t) FS_STAT_DIRECTORY);
-            entry->info.size = 0;
+            entry->info.size  = 0;
         } else {
             entry->info.flags = (FSStatFlags) 0;
             if (strcmp(entry_->d_name, ".") == 0 || strcmp(entry_->d_name, "..") == 0) {
                 entry->info.size = 0;
             } else {
-                struct stat sb{};
+                struct stat sb {};
                 int strLen = strlen(dir_handles[handle_index].path) + 1 + strlen(entry_->d_name) + 1;
                 char path[strLen];
                 snprintf(path, sizeof(path), "%s/%s", dir_handles[handle_index].path, entry_->d_name);
                 if (stat(path, &sb) >= 0) {
-                    entry->info.size = sb.st_size;
+                    entry->info.size  = sb.st_size;
                     entry->info.flags = (FSStatFlags) 0;
                     entry->info.owner = sb.st_uid;
                     entry->info.group = sb.st_gid;
@@ -285,8 +285,8 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
         if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
             auto dir_info = &dir_handles[handle_index];
             if (dir_info->readResultNumberOfEntries >= dir_info->readResultCapacity) {
-                auto newCapacity = dir_info->readResultCapacity * 2;
-                dir_info->readResult = (FSDirectoryEntry *) realloc(dir_info->readResult, newCapacity * sizeof(FSDirectoryEntry));
+                auto newCapacity             = dir_info->readResultCapacity * 2;
+                dir_info->readResult         = (FSDirectoryEntry *) realloc(dir_info->readResult, newCapacity * sizeof(FSDirectoryEntry));
                 dir_info->readResultCapacity = newCapacity;
                 if (dir_info->readResult == nullptr) {
                     OSFatal("Failed to alloc memory for dir entry list");
@@ -308,7 +308,7 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
             if (gFSClient && gFSCmd) {
                 FSDirectoryEntry realDirEntry;
                 FSStatus readDirResult = FS_STATUS_OK;
-                result = FS_STATUS_END;
+                result                 = FS_STATUS_END;
                 while (readDirResult == FS_STATUS_OK) {
                     readDirResult = real_FSReadDir(gFSClient, gFSCmd, dir_info->realDirHandle, &realDirEntry, (FSErrorFlag) FORCE_REAL_FUNC_WITH_FULL_ERRORS);
                     if (readDirResult == FS_STATUS_OK) {
@@ -389,8 +389,8 @@ FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
 
         if (dir_info->readResult != nullptr) {
             free(dir_info->readResult);
-            dir_info->readResult = nullptr;
-            dir_info->readResultCapacity = 0;
+            dir_info->readResult                = nullptr;
+            dir_info->readResultCapacity        = 0;
             dir_info->readResultNumberOfEntries = 0;
         }
         DCFlushRange(dir_info, sizeof(dirMagic_t));
@@ -511,7 +511,7 @@ FSStatus FSOpenFileWrapper(char *path,
 
         DEBUG_FUNCTION_LINE_VERBOSE("%s -> %s", path, pathForCheck);
         int handle_index = getNewFileHandleIndex();
-        FSStatus result = FS_STATUS_OK;
+        FSStatus result  = FS_STATUS_OK;
         if (handle_index >= 0) {
             OSLockMutex(file_handles[handle_index].mutex);
             int _mode = 0;
@@ -541,8 +541,8 @@ FSStatus FSOpenFileWrapper(char *path,
 
                 file_handles[handle_index].handle = FILE_HANDLE_MAGIC + handle_index;
                 //DEBUG_FUNCTION_LINE("handle %08X", file_handles[handle_index].handle);
-                *handle = file_handles[handle_index].handle;
-                file_handles[handle_index].fd = fd;
+                *handle                           = file_handles[handle_index].handle;
+                file_handles[handle_index].fd     = fd;
                 file_handles[handle_index].in_use = true;
                 DCFlushRange(&file_handles[handle_index], sizeof(fileMagic_t));
             } else {
@@ -587,7 +587,7 @@ FSStatus FSCloseFileWrapper(FSFileHandle handle,
 
     OSLockMutex(file_handles[handle_index].mutex);
 
-    int real_fd = file_handles[handle_index].fd;
+    int real_fd                       = file_handles[handle_index].fd;
     file_handles[handle_index].in_use = false;
 
     DEBUG_FUNCTION_LINE_VERBOSE("closing %d", real_fd);
@@ -634,7 +634,7 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
             DEBUG_FUNCTION_LINE("Invalid args");
             return FS_STATUS_FATAL_ERROR;
         } else {
-            struct stat path_stat{};
+            struct stat path_stat {};
             memset(&path_stat, 0, sizeof(path_stat));
             if (stat(pathForCheck, &path_stat) < 0) {
                 if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {
@@ -648,8 +648,8 @@ FSStatus FSGetStatWrapper(char *path, FSStat *stats, FSErrorFlag errorMask,
                 if (S_ISDIR(path_stat.st_mode)) {
                     stats->flags = (FSStatFlags) ((uint32_t) FS_STAT_DIRECTORY);
                 } else {
-                    stats->size = path_stat.st_size;
-                    stats->mode = (FSMode) FS_MODE_READ_OWNER;
+                    stats->size  = path_stat.st_size;
+                    stats->mode  = (FSMode) FS_MODE_READ_OWNER;
                     stats->flags = (FSStatFlags) 0;
                     stats->owner = path_stat.st_uid;
                     stats->group = path_stat.st_gid;
@@ -698,7 +698,7 @@ FSStatus FSGetStatFileWrapper(FSFileHandle handle,
     int real_fd = file_handles[handle_index].fd;
     //DEBUG_FUNCTION_LINE("FSGetStatFileAsync real_fd %d", real_fd);
 
-    struct stat path_stat{};
+    struct stat path_stat {};
 
     FSStatus result = FS_STATUS_OK;
     if (fstat(real_fd, &path_stat) < 0) {
@@ -706,8 +706,8 @@ FSStatus FSGetStatFileWrapper(FSFileHandle handle,
     } else {
         memset(&(stats->flags), 0, sizeof(stats->flags));
 
-        stats->size = path_stat.st_size;
-        stats->mode = (FSMode) FS_MODE_READ_OWNER;
+        stats->size  = path_stat.st_size;
+        stats->mode  = (FSMode) FS_MODE_READ_OWNER;
         stats->flags = (FSStatFlags) 0;
         stats->owner = path_stat.st_uid;
         stats->group = path_stat.st_gid;
@@ -779,14 +779,12 @@ FSStatus FSReadFileWithPosWrapper(void *buffer,
 
     FSStatus result;
     if ((result = FSSetPosFileWrapper(handle, pos, errorMask,
-                                      [](FSStatus res) -> FSStatus { return res; })
-        ) != FS_STATUS_OK) {
+                                      [](FSStatus res) -> FSStatus { return res; })) != FS_STATUS_OK) {
         return result;
     }
 
     result = FSReadFileWrapper(buffer, size, count, handle, unk1, errorMask,
-                               [](FSStatus res) -> FSStatus { return res; }
-    );
+                               [](FSStatus res) -> FSStatus { return res; });
 
     if (result != FS_STATUS_USE_REAL_OS && result != FS_STATUS_FATAL_ERROR) {
         return result_handler(result);
@@ -881,7 +879,7 @@ FSStatus FSIsEofWrapper(FSFileHandle handle,
     int real_fd = file_handles[handle_index].fd;
 
     off_t currentPos = lseek(real_fd, (off_t) 0, SEEK_CUR);
-    off_t endPos = lseek(real_fd, (off_t) 0, SEEK_END);
+    off_t endPos     = lseek(real_fd, (off_t) 0, SEEK_END);
 
     if (currentPos == endPos) {
         DEBUG_FUNCTION_LINE_VERBOSE("FSIsEof END for %d\n", real_fd);

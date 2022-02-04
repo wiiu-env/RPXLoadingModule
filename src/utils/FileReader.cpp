@@ -14,7 +14,7 @@ int FileReader::read(uint8_t *buffer, uint32_t size) {
         if (toRead == 0) {
             return 0;
         }
-        memcpy(buffer, input_buffer + input_pos, toRead);
+        memcpy(buffer, &input_buffer[input_pos], toRead);
         input_pos += toRead;
         return toRead;
     } else if (isReadFromFile) {
@@ -27,9 +27,9 @@ int FileReader::read(uint8_t *buffer, uint32_t size) {
 FileReader::FileReader(std::string &path) {
     int fd;
     if ((fd = open(path.c_str(), O_RDONLY)) >= 0) {
-        this->isReadFromFile = true;
+        this->isReadFromFile   = true;
         this->isReadFromBuffer = false;
-        this->file_fd = fd;
+        this->file_fd          = fd;
     } else {
         DEBUG_FUNCTION_LINE("Failed to open file %s", path.c_str());
     }
@@ -42,9 +42,9 @@ FileReader::~FileReader() {
 }
 
 FileReader::FileReader(uint8_t *buffer, uint32_t size) {
-    this->input_buffer = buffer;
-    this->input_size = size;
-    this->input_pos = 0;
+    this->input_buffer     = buffer;
+    this->input_size       = size;
+    this->input_pos        = 0;
     this->isReadFromBuffer = true;
-    this->isReadFromFile = false;
+    this->isReadFromFile   = false;
 }

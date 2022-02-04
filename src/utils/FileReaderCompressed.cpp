@@ -4,9 +4,9 @@ int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
     if (!initDone) {
         return -11;
     }
-    int startValue = this->strm.total_out;
+    int startValue   = this->strm.total_out;
     uint32_t newSize = 0;
-    int ret = 0;
+    int ret          = 0;
     do {
         uint32_t nextOut = BUFFER_SIZE;
         if (nextOut > size) {
@@ -18,7 +18,7 @@ int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
                 break;
             }
             this->strm.avail_in = read_res;
-            this->strm.next_in = this->zlib_in_buf;
+            this->strm.next_in  = this->zlib_in_buf;
         }
         /* run inflate() on input until output buffer not full */
         do {
@@ -27,8 +27,8 @@ int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
             }
 
             this->strm.avail_out = nextOut;
-            this->strm.next_out = buffer + newSize;
-            ret = inflate(&this->strm, Z_NO_FLUSH);
+            this->strm.next_out  = buffer + newSize;
+            ret                  = inflate(&this->strm, Z_NO_FLUSH);
 
             if (ret == Z_STREAM_ERROR) {
                 DEBUG_FUNCTION_LINE("Z_STREAM_ERROR");
@@ -39,7 +39,7 @@ int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
                 case Z_NEED_DICT:
                     DEBUG_FUNCTION_LINE("Z_NEED_DICT");
                     ret = Z_DATA_ERROR;
-                    [[fallthrough]];    /* and fall through */
+                    [[fallthrough]]; /* and fall through */
                 case Z_DATA_ERROR:
                 case Z_MEM_ERROR:
                     DEBUG_FUNCTION_LINE("Z_MEM_ERROR or Z_DATA_ERROR");
@@ -55,7 +55,7 @@ int FileReaderCompressed::read(uint8_t *buffer, uint32_t size) {
             }
             nextOut = BUFFER_SIZE;
             if (newSize + nextOut >= (size)) {
-                nextOut = (size) - newSize;
+                nextOut = (size) -newSize;
             }
         } while (this->strm.avail_out == 0 && newSize < (size));
 
@@ -71,12 +71,12 @@ FileReaderCompressed::FileReaderCompressed(std::string &file) : FileReader(file)
 
 void FileReaderCompressed::initCompressedData() {
     /* allocate inflate state */
-    this->strm.zalloc = Z_NULL;
-    this->strm.zfree = Z_NULL;
-    this->strm.opaque = Z_NULL;
+    this->strm.zalloc   = Z_NULL;
+    this->strm.zfree    = Z_NULL;
+    this->strm.opaque   = Z_NULL;
     this->strm.avail_in = 0;
-    this->strm.next_in = Z_NULL;
-    int ret = inflateInit2(&this->strm, MAX_WBITS | 16); //gzip
+    this->strm.next_in  = Z_NULL;
+    int ret             = inflateInit2(&this->strm, MAX_WBITS | 16); //gzip
     if (ret != Z_OK) {
         DEBUG_FUNCTION_LINE("inflateInit2 failed");
         return;

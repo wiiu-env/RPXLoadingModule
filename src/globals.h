@@ -1,6 +1,6 @@
-#include <wums.h>
-#include <coreinit/mutex.h>
 #include <coreinit/filesystem.h>
+#include <coreinit/mutex.h>
+#include <wums.h>
 
 typedef struct MetaInformation_t {
     char shortname[64];

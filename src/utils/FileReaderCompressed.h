@@ -1,8 +1,8 @@
 #pragma once
 
-#include <zlib.h>
 #include "FileReader.h"
 #include "logger.h"
+#include <zlib.h>
 
 #define BUFFER_SIZE 0x20000
 
@@ -12,8 +12,7 @@ public:
 
     explicit FileReaderCompressed(std::string &file);
 
-    ~FileReaderCompressed() override {
-    }
+    ~FileReaderCompressed() override = default;
 
     int read(uint8_t *buffer, uint32_t size) override;
 

@@ -63,8 +63,7 @@ int getNewFileHandleIndex() {
                     OSFatal("Failed to alloc memory for mutex");
                 }
                 OSInitMutex(file_handles[i].mutex);
-                DCFlushRange(file_handles[i].mutex, sizeof(OSMutex));
-                DCFlushRange(&file_handles[i], sizeof(fileMagic_t));
+                OSMemoryBarrier();
             }
             break;
         }
@@ -93,8 +92,7 @@ int32_t getNewDirHandleIndex() {
                 if (!dir_handles[i].mutex) {
                     OSFatal("Failed to alloc memory for mutex");
                 }
-                DCFlushRange(dir_handles[i].mutex, sizeof(OSMutex));
-                DCFlushRange(&dir_handles[i], sizeof(dirMagic_t));
+                OSMemoryBarrier();
             }
             break;
         }
@@ -114,7 +112,7 @@ void freeFileHandle(uint32_t handle) {
         free(file_handles[handle].mutex);
         file_handles[handle].mutex = nullptr;
     }
-    DCFlushRange(&file_handles[handle], sizeof(fileMagic_t));
+    OSMemoryBarrier();
     file_handle_mutex.unlock();
 }
 
@@ -130,7 +128,7 @@ void freeDirHandle(uint32_t handle) {
         dir_handles[handle].mutex = nullptr;
     }
     dir_handles[handle] = {};
-    DCFlushRange(&dir_handles[handle], sizeof(dirMagic_t));
+    OSMemoryBarrier();
     dir_handle_mutex.unlock();
 }
 
@@ -198,7 +196,7 @@ FSStatus FSOpenDirWrapper(char *path,
                     } else {
                         DEBUG_FUNCTION_LINE("Global FSClient or FSCmdBlock were null");
                     }
-                    DCFlushRange(dir_info, sizeof(dirMagic_t));
+                    OSMemoryBarrier();
                 }
 
                 OSUnlockMutex(dir_handles[handle_index].mutex);
@@ -252,7 +250,7 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
                 dir_info->readResultCapacity = 1;
             }
         }
-        DCFlushRange(dir_info, sizeof(dirMagic_t));
+        OSMemoryBarrier();
     }
 
     struct dirent *entry_ = readdir(dir);
@@ -296,8 +294,7 @@ FSStatus FSReadDirWrapper(FSDirectoryHandle handle,
             memcpy(&dir_info->readResult[dir_info->readResultNumberOfEntries], entry, sizeof(FSDirectoryEntry));
             dir_info->readResultNumberOfEntries++;
 
-            DCFlushRange(dir_info->readResult, sizeof(FSDirectoryEntry) * dir_info->readResultNumberOfEntries);
-            DCFlushRange(dir_info, sizeof(dirMagic_t));
+            OSMemoryBarrier();
         }
 
         result = FS_STATUS_OK;
@@ -393,7 +390,7 @@ FSStatus FSCloseDirWrapper(FSDirectoryHandle handle,
             dir_info->readResultCapacity        = 0;
             dir_info->readResultNumberOfEntries = 0;
         }
-        DCFlushRange(dir_info, sizeof(dirMagic_t));
+        OSMemoryBarrier();
     }
 
     OSUnlockMutex(dir_handles[handle_index].mutex);
@@ -441,7 +438,7 @@ FSStatus FSRewindDirWrapper(FSDirectoryHandle handle,
                 DEBUG_FUNCTION_LINE("Global FSClient or FSCmdBlock were null");
             }
         }
-        DCFlushRange(dir_info, sizeof(dirMagic_t));
+        OSMemoryBarrier();
     }
 
     OSUnlockMutex(dir_handles[handle_index].mutex);
@@ -544,7 +541,7 @@ FSStatus FSOpenFileWrapper(char *path,
                 *handle                           = file_handles[handle_index].handle;
                 file_handles[handle_index].fd     = fd;
                 file_handles[handle_index].in_use = true;
-                DCFlushRange(&file_handles[handle_index], sizeof(fileMagic_t));
+                OSMemoryBarrier();
             } else {
                 DEBUG_FUNCTION_LINE("File not found %s", pathForCheck);
                 if (gReplacementInfo.contentReplacementInfo.fallbackOnError) {

@@ -179,7 +179,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     request.path[0] = '\0';
     strncat(request.path, bundle_path, sizeof(request.path) - 1);
 
-    DCFlushRange(&request, sizeof(request));
+    OSMemoryBarrier();
 
     int success = false;
     int mcpFd   = IOS_Open("/dev/mcp", (IOSOpenMode) 0);
@@ -193,7 +193,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
         IOS_Close(mcpFd);
     }
 
-    DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+    OSMemoryBarrier();
 
     if (!success) {
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
@@ -229,7 +229,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
         }
     }
 
-    DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+    OSMemoryBarrier();
 
     return true;
 }
@@ -251,7 +251,7 @@ bool RL_UnmountCurrentRunningBundle() {
             DEBUG_FUNCTION_LINE("Unmount /vol/content");
             romfsUnmount("rom");
             gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
-            DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+            OSMemoryBarrier();
             return true;
         }
     }

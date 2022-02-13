@@ -45,7 +45,7 @@ WUMS_APPLICATION_ENDS() {
             DEBUG_FUNCTION_LINE("Unmount /vol/content");
             romfsUnmount("rom");
             gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
-            DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+            OSMemoryBarrier();
         }
     }
     gReplacementInfo.rpxReplacementInfo.isRPXReplaced = false;
@@ -94,7 +94,7 @@ WUMS_APPLICATION_STARTS() {
         DEBUG_FUNCTION_LINE("Set mode to CONTENTREDIRECT_NONE and replaceSave to false");
         gReplacementInfo.contentReplacementInfo.mode        = CONTENTREDIRECT_NONE;
         gReplacementInfo.contentReplacementInfo.replaceSave = false;
-        DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+        OSMemoryBarrier();
     } else {
         if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {
             uint32_t currentHash = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
@@ -137,6 +137,6 @@ WUMS_APPLICATION_STARTS() {
             }
         }
 
-        DCFlushRange(&gReplacementInfo, sizeof(gReplacementInfo));
+        OSMemoryBarrier();
     }
 }

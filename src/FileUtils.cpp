@@ -25,8 +25,6 @@ FSCmdBlockBody *fsCmdBlockGetBody(FSCmdBlock *cmdBlock) {
     return body;
 }
 
-std::mutex sendMutex;
-
 FSStatus send_result_async(FSClient *client, FSCmdBlock *block, FSAsyncData *asyncData, FSStatus status) {
     if (asyncData->callback != nullptr) {
         if (asyncData->ioMsgQueue != nullptr) {

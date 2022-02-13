@@ -21,11 +21,10 @@
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 WUMS_USE_WUT_DEVOPTAB();
 
-
 WUMS_INITIALIZE() {
     initLogging();
     DEBUG_FUNCTION_LINE("Patch functions");
-    // we only patch static functions, we don't need re-patch them and every launch
+    // we only patch static functions, we don't need re-patch them at every launch
     FunctionPatcherPatchFunction(fs_file_function_replacements, fs_file_function_replacements_size);
     FunctionPatcherPatchFunction(fs_dir_function_replacements, fs_dir_function_replacements_size);
     FunctionPatcherPatchFunction(rpx_utils_function_replacements, rpx_utils_function_replacements_size);

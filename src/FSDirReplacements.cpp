@@ -168,7 +168,7 @@ DECL_FUNCTION(FSStatus, FSChangeDirAsync, FSClient *client, FSCmdBlock *block, c
         gReplacementInfo.contentReplacementInfo.workingDir[len - 1] = '/';
         gReplacementInfo.contentReplacementInfo.workingDir[len]     = 0;
     }
-    DCFlushRange(gReplacementInfo.contentReplacementInfo.workingDir, sizeof(gReplacementInfo.contentReplacementInfo.workingDir));
+    OSMemoryBarrier();
     return real_FSChangeDirAsync(client, block, path, errorMask, asyncData);
 }
 

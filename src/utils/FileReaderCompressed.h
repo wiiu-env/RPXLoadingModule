@@ -18,7 +18,7 @@ public:
 
 private:
     bool initDone = false;
-    uint8_t zlib_in_buf[BUFFER_SIZE]{};
+    alignas(0x40) uint8_t zlib_in_buf[BUFFER_SIZE]{};
     z_stream strm{};
 
     void initCompressedData();

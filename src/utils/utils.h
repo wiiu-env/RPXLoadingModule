@@ -32,7 +32,6 @@ extern "C" {
 
 //Needs to have log_init() called beforehand.
 void dumpHex(const void *data, size_t size);
-BOOL OSFatal_printf(const char *fmt, ...);
 
 #ifdef __cplusplus
 }

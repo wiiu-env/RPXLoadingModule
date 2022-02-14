@@ -42,7 +42,7 @@ DECL_FUNCTION(int, RPX_FSOpenFile, FSClient *client, FSCmdBlock *block, char *pa
     if (StringTools::EndsWith(path, iconTex)) {
         if (gReplacementInfo.rpxReplacementInfo.isRPXReplaced) {
             if (StringTools::EndsWith(path, iconTex)) {
-                auto *reader = new FileReader(reinterpret_cast<uint8_t *>(gReplacementInfo.rpxReplacementInfo.iconCache), sizeof(gReplacementInfo.rpxReplacementInfo.iconCache));
+                auto *reader = new FileReader(reinterpret_cast<uint8_t *>(gReplacementInfo.rpxReplacementInfo.iconCache), ICON_SIZE);
                 *handle      = (uint32_t) reader;
                 return FS_STATUS_OK;
             }
@@ -144,7 +144,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
             }
             if (reader) {
                 uint32_t alreadyRead = 0;
-                uint32_t toRead      = sizeof(gReplacementInfo.rpxReplacementInfo.iconCache);
+                uint32_t toRead      = ICON_SIZE;
                 do {
                     int read = reader->read(reinterpret_cast<uint8_t *>(&gReplacementInfo.rpxReplacementInfo.iconCache[alreadyRead]), toRead);
                     if (read <= 0) {
@@ -152,7 +152,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
                     }
                     alreadyRead += read;
                     toRead -= read;
-                } while (alreadyRead < sizeof(gReplacementInfo.rpxReplacementInfo.iconCache));
+                } while (alreadyRead < ICON_SIZE);
                 delete reader;
             } else {
                 memset(gReplacementInfo.rpxReplacementInfo.iconCache, 0, sizeof(gReplacementInfo.rpxReplacementInfo.iconCache));

@@ -51,8 +51,10 @@ WUMS_APPLICATION_ENDS() {
     if (gFSClient) {
         FSDelClient(gFSClient, FS_ERROR_FLAG_ALL);
         free(gFSClient);
+        gFSClient = nullptr;
     }
     free(gFSCmd);
+    gFSCmd = nullptr;
 
     deinitLogging();
 }

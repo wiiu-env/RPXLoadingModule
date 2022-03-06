@@ -128,11 +128,21 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
         request.fileoffset = ((uint32_t *) &info.offset)[1];
 
         if (romfsMount("rcc", completePath.c_str(), RomfsSource_FileDescriptor_CafeOS) == 0) {
-            if (ini_parse("rcc:/meta/meta.ini", parseINIhandler, &gReplacementInfo.rpxReplacementInfo.metaInformation) < 0) {
-                DEBUG_FUNCTION_LINE("Failed to load and parse meta.ini");
-            } else {
-                metaLoaded = true;
+            uint8_t *buffer = nullptr;
+            uint32_t size   = 0;
+            if (LoadFileToMem("rcc:/meta/meta.ini", &buffer, &size) >= 0 && size > 0) {
+                buffer[size - 1] = 0;
+                if (ini_parse_string((const char *) buffer, parseINIhandler, &gReplacementInfo.rpxReplacementInfo.metaInformation) < 0) {
+                    DEBUG_FUNCTION_LINE("Failed to load and parse meta.ini");
+                } else {
+                    metaLoaded = true;
+                }
             }
+            if (buffer) {
+                free(buffer);
+                buffer = nullptr;
+            }
+
             FileReader *reader = nullptr;
 
             if (CheckFile("rcc:/meta/iconTex.tga")) {

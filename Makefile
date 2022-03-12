@@ -34,17 +34,17 @@ CFLAGS	:=	-Wall -Wextra -Os -ffunction-sections\
 
 CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__
 
-CXXFLAGS	:= $(CFLAGS) -std=c++17 
+CXXFLAGS	:= $(CFLAGS) -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map) -T$(WUMS_ROOT)/share/libfunctionpatcher.ld $(WUMSSPECS) 
+LDFLAGS	=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map) -T$(WUMS_ROOT)/share/libfunctionpatcher.ld -Tcontentredirection.ld -Twuhbutils.ld $(WUMSSPECS)
 
 ifeq ($(DEBUG),1)
 CXXFLAGS += -DDEBUG -g
 CFLAGS += -DDEBUG -g
 endif
 
-LIBS	:= -lwums -lwut -lfunctionpatcher -lromfs -lz
+LIBS	:= -lwums -lwut -lfunctionpatcher -lcontentredirection -lwuhbutils -lromfs
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level
@@ -71,6 +71,7 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
+DEFFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.def)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
 #-------------------------------------------------------------------------------
@@ -88,7 +89,7 @@ endif
 #-------------------------------------------------------------------------------
 
 export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
-export OFILES_SRC	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+export OFILES_SRC	:=	$(DEFFILES:.def=.o) $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 export OFILES 	:=	$(OFILES_BIN) $(OFILES_SRC)
 export HFILES_BIN	:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
 
@@ -128,11 +129,18 @@ $(OUTPUT).elf	:   $(OFILES)
 
 $(OFILES_SRC)	: $(HFILES_BIN)
 
+
 #-------------------------------------------------------------------------------
 # you need a rule like this for each extension you use as binary data
 #-------------------------------------------------------------------------------
-%.bin.o	%_bin.h :	%.bin
-#-------------------------------------------------------------------------------
+%.o: %.def
+	$(SILENTMSG) $(notdir $<)
+	$(SILENTCMD)rplimportgen $< $*.s $*.ld $(ERROR_FILTER)
+	$(SILENTCMD)$(CC) -x assembler-with-cpp $(ASFLAGS) -c $*.s -o $@ $(ERROR_FILTER)
+    
+#---------------------------------------------------------------------------------
+%_bin.h %.bin.o	:	%.bin
+#---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
 

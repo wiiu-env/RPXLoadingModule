@@ -18,6 +18,9 @@ typedef struct __attribute((packed)) {
 extern function_replacement_data_t rpx_utils_function_replacements[];
 extern uint32_t rpx_utils_function_replacements_size;
 
+void RPXLoadingCleanUp();
+bool RL_UnmountCurrentRunningBundle();
+
 #ifdef __cplusplus
 }
 #endif

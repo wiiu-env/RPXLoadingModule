@@ -1,8 +1,13 @@
 #include "utils/utils.h"
+#include <content_redirection/redirection.h>
 #include <coreinit/filesystem.h>
 #include <coreinit/mutex.h>
 #include <wums.h>
 #include <wut.h>
+
+#define WUHB_ROMFS_NAME         "wuhbrom"
+#define WUHB_ROMFS_PATH         WUHB_ROMFS_NAME ":"
+#define WUHB_ROMFS_CONTENT_PATH WUHB_ROMFS_PATH "/content"
 
 typedef struct WUT_PACKED MetaInformation_t {
     char shortname[64];
@@ -11,7 +16,7 @@ typedef struct WUT_PACKED MetaInformation_t {
 } MetaInformation;
 WUT_CHECK_SIZE(MetaInformation_t, 0xC0);
 
-typedef struct BundleMountInformation_t {
+typedef struct ContentRedirectionInformation_t {
     bool isMounted;
     char toMountPath[255];
     char mountedPath[255];
@@ -29,35 +34,22 @@ typedef struct WUT_PACKED RPXReplacementInfo_t {
 // make sure the iconCache is aligned to 0x40
 WUT_CHECK_OFFSET(RPXReplacementInfo, 0x100, iconCache);
 
-
-typedef enum ContentRedirect_Mode {
-    CONTENTREDIRECT_NONE,
-    CONTENTREDIRECT_FROM_WUHB_BUNDLE,
-    CONTENTREDIRECT_FROM_PATH,
-} ContentRedirect_Mode;
-
 typedef struct ContentReplacementInfo_t {
-    ContentRedirect_Mode mode;
-
     BundleMountInformation bundleMountInformation;
-
-    char workingDir[255];
-
-    char replacementPath[255];
-
-    bool replaceSave;
-
-    char savePath[255];
-
-    bool fallbackOnError;
+    char replacementPath[0x280];
 } ContentReplacementInfo;
+
+typedef struct ContentReplacementWithFallback_t {
+    char replacementPath[0x280];
+} ContentReplacementWithFallback;
 
 typedef struct RPXLoader_ReplacementInformation_t {
     RPXReplacementInfo rpxReplacementInfo;
     ContentReplacementInfo contentReplacementInfo;
+    ContentReplacementWithFallback contentReplacementWithFallbackInfo;
 } RPXLoader_ReplacementInformation;
 
-
 extern RPXLoader_ReplacementInformation gReplacementInfo;
-extern FSClient *gFSClient;
-extern FSCmdBlock *gFSCmd;
+
+extern CRLayerHandle contentLayerHandle;
+extern CRLayerHandle saveLayerHandle;

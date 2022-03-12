@@ -15,7 +15,7 @@ public:
 
     virtual ~FileReader();
 
-    virtual int read(uint8_t *buffer, uint32_t size);
+    virtual int64_t read(uint8_t *buffer, uint32_t size);
 
 private:
     bool isReadFromBuffer = false;
@@ -24,5 +24,5 @@ private:
     uint32_t input_pos    = 0;
 
     bool isReadFromFile = false;
-    int file_fd         = 0;
+    int file_fd         = -1;
 };

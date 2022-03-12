@@ -1,60 +1,62 @@
-#include <cstring>
-#include <malloc.h>
-#include <wums.h>
-
-#include "FSDirReplacements.h"
-#include "FSFileReplacements.h"
 #include "FileUtils.h"
 #include "RPXLoading.h"
 #include "globals.h"
 #include "utils/StringTools.h"
 #include "utils/logger.h"
+#include <content_redirection/redirection.h>
+#include <coreinit/cache.h>
 #include <coreinit/debug.h>
 #include <coreinit/title.h>
-#include <string>
-#include <sysapp/title.h>
-
-#include <coreinit/cache.h>
 #include <nn/act.h>
 #include <romfs_dev.h>
+#include <string>
+#include <sysapp/title.h>
+#include <wuhb_utils/utils.h>
+#include <wums.h>
 
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 WUMS_USE_WUT_DEVOPTAB();
+
+extern "C" bool CRGetVersion();
+extern "C" bool WUU_GetVersion();
 
 WUMS_INITIALIZE() {
     initLogging();
     DEBUG_FUNCTION_LINE("Patch functions");
     // we only patch static functions, we don't need re-patch them at every launch
-    FunctionPatcherPatchFunction(fs_file_function_replacements, fs_file_function_replacements_size);
-    FunctionPatcherPatchFunction(fs_dir_function_replacements, fs_dir_function_replacements_size);
     FunctionPatcherPatchFunction(rpx_utils_function_replacements, rpx_utils_function_replacements_size);
     DEBUG_FUNCTION_LINE("Patch functions finished");
     gReplacementInfo = {};
 
+    // Call this function to make sure the Content Redirection will be loaded before this module is module.
+    CRGetVersion();
+
+    // Call this function to make sure the WUHBUtils will be loaded before this module is module.
+    WUU_GetVersion();
+
+    // But then use libcontentredirection instead.
+    ContentRedirectionStatus error;
+    if ((error = ContentRedirection_Init()) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
+        DEBUG_FUNCTION_LINE_ERR("Failed to init ContentRedirection. Error %d", error);
+        OSFatal("Failed to init ContentRedirection.");
+    }
+
+    // But then use libwuhbutils instead.
+    WUHBUtilsStatus error2;
+    if ((error2 = WUHBUtils_Init()) != WUHB_UTILS_RESULT_SUCCESS) {
+        DEBUG_FUNCTION_LINE_ERR("RPXLoadingModule: Failed to init WUHBUtils. Error %d", error2);
+        OSFatal("Failed to init WUHBUtils.");
+    }
+
     deinitLogging();
 }
 
-
 WUMS_APPLICATION_ENDS() {
-    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
-        gReplacementInfo.contentReplacementInfo.mode = CONTENTREDIRECT_NONE;
-    }
-    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {
-        if (gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) {
-            DEBUG_FUNCTION_LINE("Unmount /vol/content");
-            romfsUnmount("rom");
-            gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
-            OSMemoryBarrier();
-        }
-    }
+    RL_UnmountCurrentRunningBundle();
+
     gReplacementInfo.rpxReplacementInfo.isRPXReplaced = false;
-    if (gFSClient) {
-        FSDelClient(gFSClient, FS_ERROR_FLAG_ALL);
-        free(gFSClient);
-        gFSClient = nullptr;
-    }
-    free(gFSCmd);
-    gFSCmd = nullptr;
+
+    RPXLoadingCleanUp();
 
     deinitLogging();
 }
@@ -70,74 +72,75 @@ WUMS_APPLICATION_STARTS() {
         gReplacementInfo.rpxReplacementInfo.isRPXReplaced     = true;
     }
 
-    if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_PATH) {
-        auto fsClient = (FSClient *) memalign(0x20, sizeof(FSClient));
-        auto fsCmd    = (FSCmdBlock *) memalign(0x20, sizeof(FSCmdBlock));
+    if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) == OSGetTitleID() &&
+        strlen(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) > 0) {
+        uint32_t currentHash = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
 
-        if (fsClient == nullptr || fsCmd == nullptr) {
-            DEBUG_FUNCTION_LINE("Failed to alloc memory for fsclient or fsCmd");
-            free(fsClient);
-            free(fsCmd);
-        } else {
-            auto rc = FSAddClient(fsClient, FS_ERROR_FLAG_ALL);
-            if (rc < 0) {
-                DEBUG_FUNCTION_LINE("Failed to add FSClient");
-            } else {
-                FSInitCmdBlock(fsCmd);
-                gFSClient = fsClient;
-                gFSCmd    = fsCmd;
-            }
-        }
-        return;
-    }
+        nn::act::Initialize();
+        nn::act::PersistentId persistentId = nn::act::GetPersistentId();
+        nn::act::Finalize();
 
-    if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) != OSGetTitleID()) {
-        DEBUG_FUNCTION_LINE("Set mode to CONTENTREDIRECT_NONE and replaceSave to false");
-        gReplacementInfo.contentReplacementInfo.mode        = CONTENTREDIRECT_NONE;
-        gReplacementInfo.contentReplacementInfo.replaceSave = false;
-        OSMemoryBarrier();
-    } else {
-        if (gReplacementInfo.contentReplacementInfo.mode == CONTENTREDIRECT_FROM_WUHB_BUNDLE) {
-            uint32_t currentHash = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
+        std::string basePath = string_format("/vol/external01/wiiu/apps/save/%08X", currentHash);
+        std::string common   = string_format("fs:/vol/external01/wiiu/apps/save/%08X/common", currentHash);
+        std::string user     = string_format("fs:/vol/external01/wiiu/apps/save/%08X/%08X", currentHash, 0x80000000 | persistentId);
 
-            nn::act::Initialize();
-            nn::act::PersistentId persistentId = nn::act::GetPersistentId();
-            nn::act::Finalize();
+        CreateSubfolder(common.c_str());
+        CreateSubfolder(user.c_str());
+        DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
 
-            std::string basePath = StringTools::strfmt("/vol/external01/wiiu/apps/save/%08X", currentHash);
-            std::string common   = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/common", currentHash);
-            std::string user     = StringTools::strfmt("fs:/vol/external01/wiiu/apps/save/%08X/%08X", currentHash, 0x80000000 | persistentId);
-
-            gReplacementInfo.contentReplacementInfo.savePath[0] = '\0';
-            strncat(gReplacementInfo.contentReplacementInfo.savePath,
-                    basePath.c_str(),
-                    sizeof(gReplacementInfo.contentReplacementInfo.savePath) - 1);
-
-            memset(gReplacementInfo.contentReplacementInfo.workingDir, 0, sizeof(gReplacementInfo.contentReplacementInfo.workingDir));
-
-            CreateSubfolder(common.c_str());
-            CreateSubfolder(user.c_str());
-            DEBUG_FUNCTION_LINE("Created %s and %s", common.c_str(), user.c_str());
-            if (romfsMount("rom", gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath, RomfsSource_FileDescriptor_CafeOS) == 0) {
-                gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath[0] = '\0';
-                strncat(gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath,
-                        gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath,
-                        sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath) - 1);
-
-
-                gReplacementInfo.contentReplacementInfo.replacementPath[0] = '\0';
-                strncat(gReplacementInfo.contentReplacementInfo.replacementPath,
-                        "rom:/content",
-                        sizeof(gReplacementInfo.contentReplacementInfo.replacementPath) - 1);
-
-                DEBUG_FUNCTION_LINE("Mounted %s to /vol/content", gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath);
-                gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = true;
-            } else {
-                DEBUG_FUNCTION_LINE("Failed to mount %s", gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
+        if (romfsMount(WUHB_ROMFS_NAME, gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath, RomfsSource_FileDescriptor_CafeOS) == 0) {
+            auto device = GetDeviceOpTab(WUHB_ROMFS_PATH);
+            if (device == nullptr || strcmp(device->name, WUHB_ROMFS_NAME) != 0) {
+                romfsUnmount(WUHB_ROMFS_NAME);
                 gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
+                DEBUG_FUNCTION_LINE_ERR("DeviceOpTab for %s not found.", WUHB_ROMFS_PATH);
+                return;
+            }
+            int outRes = -1;
+            if (ContentRedirection_AddDevice(device, &outRes) != CONTENT_REDIRECTION_RESULT_SUCCESS || outRes < 0) {
+                DEBUG_FUNCTION_LINE_ERR("Failed to AddDevice to ContentRedirection");
+                romfsUnmount(WUHB_ROMFS_NAME);
+                gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
+                return;
+            }
+            auto res = ContentRedirection_AddFSLayer(&contentLayerHandle,
+                                                     "WUHB Content",
+                                                     WUHB_ROMFS_CONTENT_PATH,
+                                                     FS_LAYER_TYPE_CONTENT_REPLACE);
+            if (res == CONTENT_REDIRECTION_RESULT_SUCCESS) {
+                res = ContentRedirection_AddFSLayer(&saveLayerHandle,
+                                                    "WUHB Save",
+                                                    basePath.c_str(),
+                                                    FS_LAYER_TYPE_SAVE_REPLACE);
+                if (res == CONTENT_REDIRECTION_RESULT_SUCCESS) {
+                    gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath[0] = '\0';
+                    strncpy(gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath,
+                            gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath,
+                            sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath));
+                    DEBUG_FUNCTION_LINE_VERBOSE("Mounted %s to /vol/content", gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath);
+                    gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted      = true;
+                    gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath[0] = '\0';
+
+                    OSMemoryBarrier();
+                    return;
+                } else {
+                    if (contentLayerHandle != 0) {
+                        ContentRedirection_RemoveFSLayer(contentLayerHandle);
+                        contentLayerHandle = 0;
+                    }
+                    DEBUG_FUNCTION_LINE_ERR("ContentRedirection_AddFSLayer had failed for save");
+                }
+            } else {
+                int outRes = -1;
+                if (ContentRedirection_RemoveDevice(WUHB_ROMFS_PATH, &outRes) != CONTENT_REDIRECTION_RESULT_SUCCESS || res < 0) {
+                    DEBUG_FUNCTION_LINE_ERR("Failed to remove device");
+                }
+                romfsUnmount(WUHB_ROMFS_PATH);
+                DEBUG_FUNCTION_LINE_ERR("ContentRedirection_AddFSLayer had failed for content");
             }
         }
-
+        DEBUG_FUNCTION_LINE_ERR("Failed to mount %s", gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
+        gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
         OSMemoryBarrier();
     }
 }

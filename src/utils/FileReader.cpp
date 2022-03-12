@@ -2,7 +2,7 @@
 #include "logger.h"
 #include <cstring>
 
-int FileReader::read(uint8_t *buffer, uint32_t size) {
+int64_t FileReader::read(uint8_t *buffer, uint32_t size) {
     if (isReadFromBuffer) {
         if (input_buffer == nullptr) {
             return -1;
@@ -31,7 +31,7 @@ FileReader::FileReader(std::string &path) {
         this->isReadFromBuffer = false;
         this->file_fd          = fd;
     } else {
-        DEBUG_FUNCTION_LINE("Failed to open file %s", path.c_str());
+        DEBUG_FUNCTION_LINE_ERR("Failed to open file %s", path.c_str());
     }
 }
 

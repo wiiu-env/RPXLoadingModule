@@ -7,6 +7,7 @@
 2. Requires the [WUMSLoader](https://github.com/wiiu-env/WUMSLoader) in `sd:/wiiu/environments/[ENVIRONMENT]/modules/setup`.
 3. Requires the [ContentRedirectionModule](https://github.com/wiiu-env/ContentRedirectionModule) in `sd:/wiiu/environments/[ENVIRONMENT]/modules/setup`.
 4. Requires the [WUHBUtilsModule](https://github.com/wiiu-env/WUHBUtilsModule) in `sd:/wiiu/environments/[ENVIRONMENT]/modules/setup`.
+5. Use [librpxloading](https://github.com/wiiu-env/librpxloader)
 
 ## Buildflags
 

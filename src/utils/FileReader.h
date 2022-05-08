@@ -17,6 +17,10 @@ public:
 
     virtual int64_t read(uint8_t *buffer, uint32_t size);
 
+    uint32_t getHandle() {
+        return (uint32_t) this;
+    }
+
 private:
     bool isReadFromBuffer = false;
     uint8_t *input_buffer = nullptr;

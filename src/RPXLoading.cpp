@@ -16,13 +16,10 @@
 #include <wuhb_utils/utils.h>
 
 std::mutex fileReaderListMutex;
-std::vector<FileReader *> openFileReaders;
+std::forward_list<std::unique_ptr<FileReader>> openFileReaders;
 
 void RPXLoadingCleanUp() {
     const std::lock_guard<std::mutex> lock(fileReaderListMutex);
-    for (auto &reader : openFileReaders) {
-        delete reader;
-    }
     openFileReaders.clear();
 }
 
@@ -46,18 +43,18 @@ DECL_FUNCTION(int32_t, HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, uint32_t titleid_u
     return result;
 }
 
-DECL_FUNCTION(int, RPX_FSOpenFile, FSClient *client, FSCmdBlock *block, char *path, const char *mode, int *handle, int error) {
+DECL_FUNCTION(int, RPX_FSOpenFile, FSClient *client, FSCmdBlock *block, char *path, const char *mode, uint32_t *handle, int error) {
     const char *iconTex       = "iconTex.tga";
     std::string_view pathView = path;
     if (gReplacementInfo.rpxReplacementInfo.isRPXReplaced && pathView.ends_with(iconTex)) {
         const std::lock_guard<std::mutex> lock(fileReaderListMutex);
-        auto *reader = new (std::nothrow) FileReader(reinterpret_cast<uint8_t *>(gReplacementInfo.rpxReplacementInfo.iconCache), ICON_SIZE);
+        auto reader = make_unique_nothrow<FileReader>(reinterpret_cast<uint8_t *>(gReplacementInfo.rpxReplacementInfo.iconCache), ICON_SIZE);
         if (!reader) {
             DEBUG_FUNCTION_LINE_ERR("Failed to allocate memory for the FileReader");
             return FS_STATUS_FATAL_ERROR;
         }
-        openFileReaders.push_back(reader);
-        *handle = reinterpret_cast<int>(reader);
+        *handle = reader->getHandle();
+        openFileReaders.push_front(std::move(reader));
         return FS_STATUS_OK;
     }
     int result = real_RPX_FSOpenFile(client, block, path, mode, handle, error);
@@ -68,7 +65,7 @@ DECL_FUNCTION(FSStatus, RPX_FSReadFile, FSClient *client, FSCmdBlock *block, uin
     if (gReplacementInfo.rpxReplacementInfo.isRPXReplaced) {
         const std::lock_guard<std::mutex> lock(fileReaderListMutex);
         for (auto &reader : openFileReaders) {
-            if ((uint32_t) reader == (uint32_t) handle) {
+            if ((uint32_t) reader->getHandle() == (uint32_t) handle) {
                 return (FSStatus) (reader->read(buffer, size * count) / size);
             }
         }
@@ -78,21 +75,7 @@ DECL_FUNCTION(FSStatus, RPX_FSReadFile, FSClient *client, FSCmdBlock *block, uin
 
 DECL_FUNCTION(FSStatus, RPX_FSCloseFile, FSClient *client, FSCmdBlock *block, FSFileHandle handle, uint32_t flags) {
     if (gReplacementInfo.rpxReplacementInfo.isRPXReplaced) {
-        const std::lock_guard<std::mutex> lock(fileReaderListMutex);
-        bool found         = false;
-        int index          = 0;
-        FileReader *reader = nullptr;
-        for (auto &cur : openFileReaders) {
-            if ((uint32_t) cur == (uint32_t) handle) {
-                found  = true;
-                reader = cur;
-                break;
-            }
-            index++;
-        }
-        if (found) {
-            openFileReaders.erase(openFileReaders.begin() + index);
-            delete reader;
+        if (remove_locked_first_if(fileReaderListMutex, openFileReaders, [handle](auto &cur) { return cur->getHandle() == (uint32_t) handle; })) {
             return FS_STATUS_OK;
         }
     }

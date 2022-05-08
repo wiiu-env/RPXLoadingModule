@@ -23,8 +23,11 @@ extern "C" bool WUU_GetVersion();
 WUMS_INITIALIZE() {
     initLogging();
     DEBUG_FUNCTION_LINE("Patch functions");
-    // we only patch static functions, we don't need re-patch them at every launch
-    FunctionPatcherPatchFunction(rpx_utils_function_replacements, rpx_utils_function_replacements_size);
+    for (uint32_t i = 0; i < rpx_utils_function_replacements_size; i++) {
+        if (!FunctionPatcherPatchFunction(&rpx_utils_function_replacements[i], nullptr)) {
+            OSFatal("homebrew_rpx_loader: Failed to patch function");
+        }
+    }
     DEBUG_FUNCTION_LINE("Patch functions finished");
     gReplacementInfo = {};
 

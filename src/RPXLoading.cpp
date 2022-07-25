@@ -197,9 +197,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     int success = false;
     int mcpFd   = IOS_Open("/dev/mcp", (IOSOpenMode) 0);
     if (mcpFd >= 0) {
-        int out = 0;
-        IOS_Ioctl(mcpFd, 100, &request, sizeof(request), &out, sizeof(out));
-        if (out > 0) {
+        if (IOS_Ioctl(mcpFd, 100, &request, sizeof(request), nullptr, 0) == IOS_ERROR_OK) {
             success = true;
         }
 

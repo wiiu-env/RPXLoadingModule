@@ -83,7 +83,7 @@ WUMS_APPLICATION_STARTS() {
         nn::act::PersistentId persistentId = nn::act::GetPersistentId();
         nn::act::Finalize();
 
-        std::string basePath = string_format("/vol/external01/wiiu/apps/save/%08X", currentHash);
+        std::string basePath = string_format("fs:/vol/external01/wiiu/apps/save/%08X", currentHash);
         std::string common   = string_format("fs:/vol/external01/wiiu/apps/save/%08X/common", currentHash);
         std::string user     = string_format("fs:/vol/external01/wiiu/apps/save/%08X/%08X", currentHash, 0x80000000 | persistentId);
 

@@ -8,6 +8,7 @@
 #include <coreinit/debug.h>
 #include <coreinit/ios.h>
 #include <cstring>
+#include <mocha/mocha.h>
 #include <mutex>
 #include <nn/acp/title.h>
 #include <romfs_dev.h>
@@ -117,13 +118,12 @@ static int parseINIhandler(void *user, const char *section, const char *name,
 }
 
 bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
-    LOAD_REQUEST request;
+    MochaRPXLoadInfo request;
     memset(&request, 0, sizeof(request));
 
-    request.command    = 0xFC; // IPC_CUSTOM_LOAD_CUSTOM_RPX;
-    request.target     = 0;    // LOAD_FILE_TARGET_SD_CARD
-    request.filesize   = 0;    // unknown filesize
-    request.fileoffset = 0;    //
+    request.target     = LOAD_RPX_TARGET_SD_CARD; // LOAD_FILE_TARGET_SD_CARD
+    request.filesize   = 0;                       // unknown filesize
+    request.fileoffset = 0;                       //
 
     WUHBRPXInfo fileInfo;
 
@@ -193,20 +193,18 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
     strncat(request.path, bundle_path, sizeof(request.path) - 1);
 
     OSMemoryBarrier();
-
-    int success = false;
-    int mcpFd   = IOS_Open("/dev/mcp", (IOSOpenMode) 0);
-    if (mcpFd >= 0) {
-        if (IOS_Ioctl(mcpFd, 100, &request, sizeof(request), nullptr, 0) == IOS_ERROR_OK) {
-            success = true;
-        }
-
-        IOS_Close(mcpFd);
+    bool success = false;
+    MochaUtilsStatus res;
+    if ((res = Mocha_PrepareRPXLaunch(&request)) == MOCHA_RESULT_SUCCESS) {
+        success = true;
+    } else {
+        DEBUG_FUNCTION_LINE_ERR("Failed to prepare rpx launch: %s", Mocha_GetStatusStr(res));
     }
 
-    OSMemoryBarrier();
-
     if (!success) {
+        request.target = LOAD_RPX_TARGET_EXTRA_REVERT_PREPARE;
+        Mocha_PrepareRPXLaunch(&request);
+
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
         DEBUG_FUNCTION_LINE_ERR("Failed to load %s on next restart", request.path);
         return false;

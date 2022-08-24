@@ -7,6 +7,7 @@
 #include <coreinit/cache.h>
 #include <coreinit/debug.h>
 #include <coreinit/title.h>
+#include <mocha/mocha.h>
 #include <nn/act.h>
 #include <romfs_dev.h>
 #include <string>
@@ -49,6 +50,14 @@ WUMS_INITIALIZE() {
     if ((error2 = WUHBUtils_Init()) != WUHB_UTILS_RESULT_SUCCESS) {
         DEBUG_FUNCTION_LINE_ERR("RPXLoadingModule: Failed to init WUHBUtils. Error %d", error2);
         OSFatal("Failed to init WUHBUtils.");
+    }
+
+
+    // Init libmocha
+    MochaUtilsStatus error3;
+    if ((error3 = Mocha_InitLibrary()) != MOCHA_RESULT_SUCCESS) {
+        DEBUG_FUNCTION_LINE_ERR("Failed to init libmocha. Error %s", Mocha_GetStatusStr(error3));
+        OSFatal("Failed to init libmocha. Make sure to use the latest version of MochaPayload");
     }
 
     deinitLogging();

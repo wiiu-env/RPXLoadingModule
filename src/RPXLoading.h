@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <function_patcher/function_patching.h>
+#include <rpxloader/rpxloader.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,7 +20,7 @@ extern function_replacement_data_t rpx_utils_function_replacements[];
 extern uint32_t rpx_utils_function_replacements_size;
 
 void RPXLoadingCleanUp();
-bool RL_UnmountCurrentRunningBundle();
+RPXLoaderStatus RL_UnmountCurrentRunningBundle();
 
 #ifdef __cplusplus
 }

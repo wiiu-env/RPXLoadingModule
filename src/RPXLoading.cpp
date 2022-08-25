@@ -117,7 +117,7 @@ static int parseINIhandler(void *user, const char *section, const char *name,
     return 1;
 }
 
-bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
+RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
     MochaRPXLoadInfo request;
     memset(&request, 0, sizeof(request));
 
@@ -207,7 +207,7 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
 
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;
         DEBUG_FUNCTION_LINE_ERR("Failed to load %s on next restart", request.path);
-        return false;
+        return RPX_LOADER_RESULT_UNKNOWN_ERROR;
     } else {
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = true;
     }
@@ -234,51 +234,82 @@ bool RL_LoadFromSDOnNextLaunch(const char *bundle_path) {
 
     OSMemoryBarrier();
 
-    return true;
+    return RPX_LOADER_RESULT_SUCCESS;
+}
+
+RPXLoaderStatus RL_LaunchPreparedHomebrew() {
+    // Request to launch the homebrew wrapper (H&S or Daily Log)
+    auto res = Mocha_LaunchHomebrewWrapper();
+    if (res != MOCHA_RESULT_SUCCESS) {
+        DEBUG_FUNCTION_LINE_ERR("Launch failed: %s", Mocha_GetStatusStr(res));
+    }
+    if (res == MOCHA_RESULT_NOT_FOUND) {
+        return RPX_LOADER_RESULT_NOT_FOUND;
+    } else if (res != MOCHA_RESULT_SUCCESS) {
+        return RPX_LOADER_RESULT_UNKNOWN_ERROR;
+    }
+    return RPX_LOADER_RESULT_SUCCESS;
+}
+
+RPXLoaderStatus RL_LaunchHomebrew(const char *bundle_path) {
+    RPXLoaderStatus res = RPX_LOADER_RESULT_SUCCESS;
+    // Tell iosu which .rpx to launch and prepare the content redirection.
+    if ((res = RL_PrepareLaunchFromSD(bundle_path)) != RPX_LOADER_RESULT_SUCCESS) {
+        return res;
+    }
+    // Request to launch the homebrew wrapper (H&S or Daily Log)
+    if ((res = RL_LaunchPreparedHomebrew()) != RPX_LOADER_RESULT_SUCCESS) {
+        // If we fail to launch the correct application, we revert the .rpx redirection.
+        MochaRPXLoadInfo loadInfoRevert;
+        loadInfoRevert.target = LOAD_RPX_TARGET_EXTRA_REVERT_PREPARE;
+
+        if (MochaUtilsStatus mochaRes = Mocha_PrepareRPXLaunch(&loadInfoRevert); mochaRes != MOCHA_RESULT_SUCCESS) {
+            DEBUG_FUNCTION_LINE_WARN("Revert Mocha_PrepareRPXLaunch failed: %s [%d]", Mocha_GetStatusStr(mochaRes), mochaRes);
+        }
+        return res;
+    }
+
+    return res;
 }
 
 std::mutex mutex;
 
-bool RL_DisableContentRedirection() {
+RPXLoaderStatus RL_DisableContentRedirection() {
     std::lock_guard<std::mutex> lock(mutex);
     if (contentLayerHandle != 0) {
-        auto res = ContentRedirection_SetActive(contentLayerHandle, false);
-        if (res != CONTENT_REDIRECTION_RESULT_SUCCESS) {
-            return false;
+        if (ContentRedirection_SetActive(contentLayerHandle, false) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
+            return RPX_LOADER_RESULT_UNKNOWN_ERROR;
         }
     }
     if (saveLayerHandle != 0) {
-        auto res = ContentRedirection_SetActive(saveLayerHandle, false);
-        if (res != CONTENT_REDIRECTION_RESULT_SUCCESS) {
+        if (ContentRedirection_SetActive(saveLayerHandle, false) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
             ContentRedirection_SetActive(contentLayerHandle, true);
-            return false;
+            return RPX_LOADER_RESULT_UNKNOWN_ERROR;
         }
     }
-    return true;
+    return RPX_LOADER_RESULT_SUCCESS;
 }
 
-bool RL_EnableContentRedirection() {
+RPXLoaderStatus RL_EnableContentRedirection() {
     std::lock_guard<std::mutex> lock(mutex);
     if (contentLayerHandle != 0) {
-        auto res = ContentRedirection_SetActive(contentLayerHandle, true);
-        if (res != CONTENT_REDIRECTION_RESULT_SUCCESS) {
-            return false;
+        if (ContentRedirection_SetActive(contentLayerHandle, true) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
+            return RPX_LOADER_RESULT_UNKNOWN_ERROR;
         }
     }
     if (saveLayerHandle != 0) {
-        auto res = ContentRedirection_SetActive(saveLayerHandle, true);
-        if (res != CONTENT_REDIRECTION_RESULT_SUCCESS) {
+        if (ContentRedirection_SetActive(saveLayerHandle, true) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
             ContentRedirection_SetActive(contentLayerHandle, false);
-            return false;
+            return RPX_LOADER_RESULT_UNKNOWN_ERROR;
         }
     }
-    return true;
+    return RPX_LOADER_RESULT_SUCCESS;
 }
 
-bool RL_UnmountCurrentRunningBundle() {
+RPXLoaderStatus RL_UnmountCurrentRunningBundle() {
     std::lock_guard<std::mutex> lock(mutex);
     if (gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted == false) {
-        return true;
+        return RPX_LOADER_RESULT_SUCCESS;
     }
 
     int outRes = -1;
@@ -292,34 +323,44 @@ bool RL_UnmountCurrentRunningBundle() {
         OSFatal("RL_UnmountCurrentRunningBundle: ContentRedirection_RemoveDevice failed");
     }
 
-    bool res = true;
+    RPXLoaderStatus res = RPX_LOADER_RESULT_SUCCESS;
 
     if (contentLayerHandle != 0) {
         if (ContentRedirection_RemoveFSLayer(contentLayerHandle) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
-            res = false;
+            res = RPX_LOADER_RESULT_UNKNOWN_ERROR;
         }
         contentLayerHandle = 0;
     }
 
     if (saveLayerHandle != 0) {
         if (ContentRedirection_RemoveFSLayer(saveLayerHandle) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
-            res = false;
+            res = RPX_LOADER_RESULT_UNKNOWN_ERROR;
         }
         saveLayerHandle = 0;
     }
 
-    romfsUnmount(WUHB_ROMFS_NAME);
+    if (romfsUnmount(WUHB_ROMFS_NAME) < 0) {
+        DEBUG_FUNCTION_LINE_WARN("Failed to unmount romfs \"%s\"", WUHB_ROMFS_NAME);
+    }
     gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted = false;
     OSMemoryBarrier();
     return res;
 }
 
-RPXLoaderVersion RL_GetVersion() {
-    return RPX_LOADER_MODULE_VERSION;
+RPXLoaderStatus RL_GetVersion(RPXLoaderVersion *outVersion) {
+    if (!outVersion) {
+        return RPX_LOADER_RESULT_INVALID_ARGUMENT;
+    }
+    *outVersion = 1;
+    return RPX_LOADER_RESULT_SUCCESS;
 }
 
+
+WUMS_EXPORT_FUNCTION(RL_PrepareLaunchFromSD);
+WUMS_EXPORT_FUNCTION(RL_LaunchPreparedHomebrew);
+WUMS_EXPORT_FUNCTION(RL_LaunchHomebrew);
+
 WUMS_EXPORT_FUNCTION(RL_GetVersion);
-WUMS_EXPORT_FUNCTION(RL_LoadFromSDOnNextLaunch);
 WUMS_EXPORT_FUNCTION(RL_EnableContentRedirection);
 WUMS_EXPORT_FUNCTION(RL_DisableContentRedirection);
 WUMS_EXPORT_FUNCTION(RL_UnmountCurrentRunningBundle);

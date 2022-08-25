@@ -22,6 +22,7 @@ WUT_ROOT := $(DEVKITPRO)/wut
 TARGET		:=	RPXLoadingModule
 BUILD		:=	build
 SOURCES		:=	src \
+                src/data \
                 src/utils
 DATA		:=	data
 INCLUDES	:=	src

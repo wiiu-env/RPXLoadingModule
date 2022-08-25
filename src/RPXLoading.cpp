@@ -1,4 +1,5 @@
 #include "RPXLoading.h"
+#include "data/defaultIcon.h"
 #include "globals.h"
 #include "utils/FileReader.h"
 #include "utils/StringTools.h"
@@ -172,6 +173,7 @@ RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
                 memcpy(gReplacementInfo.rpxReplacementInfo.iconCache, buffer, cpySize);
                 free(buffer);
             } else {
+                memcpy(gReplacementInfo.rpxReplacementInfo.iconCache, defaultIconTexTGA, ICON_SIZE);
                 DEBUG_FUNCTION_LINE_ERR("Failed to read iconTex.tga");
             }
 
@@ -182,7 +184,7 @@ RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
         }
     } else {
         if (!gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted) {
-            memset(gReplacementInfo.rpxReplacementInfo.iconCache, 0, sizeof(gReplacementInfo.rpxReplacementInfo.iconCache));
+            memcpy(gReplacementInfo.rpxReplacementInfo.iconCache, defaultIconTexTGA, ICON_SIZE);
         }
     }
 

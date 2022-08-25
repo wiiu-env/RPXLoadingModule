@@ -129,7 +129,14 @@ RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
 
     bool metaLoaded = false;
 
-    std::string completePath = std::string("/vol/external01/") + bundle_path;
+    std::string completePath       = std::string("/vol/external01/") + bundle_path;
+    std::string completeNewLibPath = std::string("fs:/vol/external01/") + bundle_path;
+
+    struct stat st {};
+    if (stat(completeNewLibPath.c_str(), &st) < 0) {
+        DEBUG_FUNCTION_LINE_ERR("Failed to prepare launch from SD, file (%s) not found.", bundle_path);
+        return RPX_LOADER_RESULT_NOT_FOUND;
+    }
 
     bool isBundle = false;
     auto rpxInfo  = WUHBUtils_GetRPXInfo(completePath.c_str(), BundleSource_FileDescriptor_CafeOS, &fileInfo);

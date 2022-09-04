@@ -18,8 +18,8 @@
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 WUMS_USE_WUT_DEVOPTAB();
 
-extern "C" bool CRGetVersion();
-extern "C" bool WUU_GetVersion();
+extern "C" ContentRedirectionApiErrorType CRGetVersion(ContentRedirectionVersion *);
+extern "C" WUHBUtilsApiErrorType WUU_GetVersion(WUHBUtilsVersion *);
 
 WUMS_INITIALIZE() {
     initLogging();
@@ -33,22 +33,22 @@ WUMS_INITIALIZE() {
     gReplacementInfo = {};
 
     // Call this function to make sure the Content Redirection will be loaded before this module is module.
-    CRGetVersion();
+    CRGetVersion(nullptr);
 
     // Call this function to make sure the WUHBUtils will be loaded before this module is module.
-    WUU_GetVersion();
+    WUU_GetVersion(nullptr);
 
     // But then use libcontentredirection instead.
     ContentRedirectionStatus error;
-    if ((error = ContentRedirection_Init()) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
+    if ((error = ContentRedirection_InitLibrary()) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
         DEBUG_FUNCTION_LINE_ERR("Failed to init ContentRedirection. Error %d", error);
         OSFatal("Failed to init ContentRedirection.");
     }
 
     // But then use libwuhbutils instead.
     WUHBUtilsStatus error2;
-    if ((error2 = WUHBUtils_Init()) != WUHB_UTILS_RESULT_SUCCESS) {
-        DEBUG_FUNCTION_LINE_ERR("RPXLoadingModule: Failed to init WUHBUtils. Error %d", error2);
+    if ((error2 = WUHBUtils_InitLibrary()) != WUHB_UTILS_RESULT_SUCCESS) {
+        DEBUG_FUNCTION_LINE_ERR("Failed to init WUHBUtils. Error %d", error2);
         OSFatal("Failed to init WUHBUtils.");
     }
 

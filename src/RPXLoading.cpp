@@ -8,6 +8,7 @@
 #include <coreinit/cache.h>
 #include <coreinit/debug.h>
 #include <coreinit/ios.h>
+#include <coreinit/title.h>
 #include <cstring>
 #include <mocha/mocha.h>
 #include <mutex>
@@ -15,6 +16,7 @@
 #include <romfs_dev.h>
 #include <rpxloader/rpxloader.h>
 #include <string>
+#include <sysapp/title.h>
 #include <wuhb_utils/utils.h>
 
 std::mutex fileReaderListMutex;
@@ -88,12 +90,33 @@ DECL_FUNCTION(FSStatus, RPX_FSCloseFile, FSClient *client, FSCmdBlock *block, FS
 DECL_FUNCTION(void, Loader_ReportWarn) {
 }
 
+RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path);
+
+DECL_FUNCTION(void, OSRestartGame, int argc, char *argv[]) {
+    if (OSGetTitleID() == _SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) &&
+        strlen(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) == 0) {
+        RL_PrepareLaunchFromSD(gReplacementInfo.lastFileLoaded);
+    }
+    real_OSRestartGame(argc, argv);
+}
+
+DECL_FUNCTION(void, _SYSLaunchTitleWithStdArgsInNoSplash, uint64_t titleId, void *u1) {
+    if (titleId == _SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) &&
+        titleId == OSGetTitleID() &&
+        strlen(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) == 0) {
+        RL_PrepareLaunchFromSD(gReplacementInfo.lastFileLoaded);
+    }
+    real__SYSLaunchTitleWithStdArgsInNoSplash(titleId, u1);
+}
+
 function_replacement_data_t rpx_utils_function_replacements[] = {
         REPLACE_FUNCTION_VIA_ADDRESS(Loader_ReportWarn, 0x32002f74, 0x01002f74),
         REPLACE_FUNCTION_VIA_ADDRESS_FOR_PROCESS(HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, 0x2E36CE44, 0x0E36CE44, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSOpenFile, LIBRARY_COREINIT, FSOpenFile, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSReadFile, LIBRARY_COREINIT, FSReadFile, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSCloseFile, LIBRARY_COREINIT, FSCloseFile, FP_TARGET_PROCESS_HOME_MENU),
+        REPLACE_FUNCTION(OSRestartGame, LIBRARY_COREINIT, OSRestartGame),
+        REPLACE_FUNCTION(_SYSLaunchTitleWithStdArgsInNoSplash, LIBRARY_SYSAPP, _SYSLaunchTitleWithStdArgsInNoSplash),
 };
 
 uint32_t rpx_utils_function_replacements_size = sizeof(rpx_utils_function_replacements) / sizeof(function_replacement_data_t);
@@ -240,6 +263,8 @@ RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
                     sizeof(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) - 2);
         }
     }
+
+    strncpy(gReplacementInfo.lastFileLoaded, bundle_path, sizeof(gReplacementInfo.lastFileLoaded) - 2);
 
     OSMemoryBarrier();
 

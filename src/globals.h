@@ -47,6 +47,7 @@ typedef struct RPXLoader_ReplacementInformation_t {
     RPXReplacementInfo rpxReplacementInfo;
     ContentReplacementInfo contentReplacementInfo;
     ContentReplacementWithFallback contentReplacementWithFallbackInfo;
+    char lastFileLoaded[0x280];
 } RPXLoader_ReplacementInformation;
 
 extern RPXLoader_ReplacementInformation gReplacementInfo;

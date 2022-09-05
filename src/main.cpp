@@ -84,6 +84,10 @@ WUMS_APPLICATION_STARTS() {
         gReplacementInfo.rpxReplacementInfo.isRPXReplaced     = true;
     }
 
+    if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) != OSGetTitleID()) {
+        gReplacementInfo.lastFileLoaded[0] = '\0';
+    }
+
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) == OSGetTitleID() &&
         strlen(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) > 0) {
         uint32_t currentHash = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);

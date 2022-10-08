@@ -347,7 +347,7 @@ RPXLoaderStatus RL_UnmountCurrentRunningBundle() {
     }
 
     int outRes = -1;
-    if (ContentRedirection_RemoveDevice(WUHB_ROMFS_NAME, &outRes) == CONTENT_REDIRECTION_RESULT_SUCCESS) {
+    if (ContentRedirection_RemoveDevice(WUHB_ROMFS_PATH, &outRes) == CONTENT_REDIRECTION_RESULT_SUCCESS) {
         if (outRes < 0) {
             DEBUG_FUNCTION_LINE_ERR("RemoveDevice \"%s\" failed for ContentRedirection Module", WUHB_ROMFS_NAME);
             OSFatal("RL_UnmountCurrentRunningBundle: RemoveDevice \"" WUHB_ROMFS_NAME "\" failed for ContentRedirection Module");

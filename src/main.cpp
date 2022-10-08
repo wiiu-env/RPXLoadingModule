@@ -90,15 +90,20 @@ WUMS_APPLICATION_STARTS() {
 
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) == OSGetTitleID() &&
         strlen(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) > 0) {
-        uint32_t currentHash = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
+        uint32_t currentHash           = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
+        std::string shortNameSanitized = sanitizeName(gReplacementInfo.rpxReplacementInfo.metaInformation.shortname);
 
         nn::act::Initialize();
         nn::act::PersistentId persistentId = nn::act::GetPersistentId();
         nn::act::Finalize();
 
         std::string basePath = string_format("fs:/vol/external01/wiiu/apps/save/%08X", currentHash);
-        std::string common   = string_format("fs:/vol/external01/wiiu/apps/save/%08X/common", currentHash);
-        std::string user     = string_format("fs:/vol/external01/wiiu/apps/save/%08X/%08X", currentHash, 0x80000000 | persistentId);
+        if (!shortNameSanitized.empty()) {
+            basePath += string_format(" (%s)", shortNameSanitized.c_str());
+        }
+
+        std::string common = basePath + "/common";
+        std::string user   = basePath + string_format("/%08X", 0x80000000 | persistentId);
 
         CreateSubfolder(common.c_str());
         CreateSubfolder(user.c_str());

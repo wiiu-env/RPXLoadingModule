@@ -35,6 +35,8 @@ bool remove_locked_first_if(std::mutex &mutex, std::forward_list<T, Allocator> &
     return false;
 }
 
+std::string sanitizeName(const std::string &input);
+
 // those work only in powers of 2
 #define ROUNDDOWN(val, align) ((val) & ~(align - 1))
 #define ROUNDUP(val, align)   ROUNDDOWN(((val) + (align - 1)), align)

@@ -3,6 +3,7 @@
 #include "globals.h"
 #include "utils/StringTools.h"
 #include "utils/logger.h"
+#include "version.h"
 #include <content_redirection/redirection.h>
 #include <coreinit/cache.h>
 #include <coreinit/debug.h>
@@ -14,6 +15,8 @@
 #include <sysapp/title.h>
 #include <wuhb_utils/utils.h>
 #include <wums.h>
+
+#define VERSION "v0.2.1"
 
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 WUMS_USE_WUT_DEVOPTAB();
@@ -78,6 +81,7 @@ WUMS_APPLICATION_STARTS() {
     if (upid != 2 && upid != 15) {
         return;
     }
+    OSReport("Running RPXLoadingModule " VERSION VERSION_EXTRA "\n");
     initLogging();
     if (gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced) {
         gReplacementInfo.rpxReplacementInfo.willRPXBeReplaced = false;

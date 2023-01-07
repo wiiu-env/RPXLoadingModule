@@ -87,9 +87,6 @@ DECL_FUNCTION(FSStatus, RPX_FSCloseFile, FSClient *client, FSCmdBlock *block, FS
     return real_RPX_FSCloseFile(client, block, handle, flags);
 }
 
-DECL_FUNCTION(void, Loader_ReportWarn) {
-}
-
 RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path);
 
 DECL_FUNCTION(void, OSRestartGame, int argc, char *argv[]) {
@@ -110,7 +107,6 @@ DECL_FUNCTION(void, _SYSLaunchTitleWithStdArgsInNoSplash, uint64_t titleId, void
 }
 
 function_replacement_data_t rpx_utils_function_replacements[] = {
-        REPLACE_FUNCTION_VIA_ADDRESS(Loader_ReportWarn, 0x32002f74, 0x01002f74),
         REPLACE_FUNCTION_VIA_ADDRESS_FOR_PROCESS(HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, 0x2E36CE44, 0x0E36CE44, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSOpenFile, LIBRARY_COREINIT, FSOpenFile, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSReadFile, LIBRARY_COREINIT, FSReadFile, FP_TARGET_PROCESS_HOME_MENU),

@@ -27,9 +27,15 @@ WUMS_DEPENDS_ON(homebrew_functionpatcher);
 
 WUMS_INITIALIZE() {
     initLogging();
+
+    if (FunctionPatcher_InitLibrary() != FUNCTION_PATCHER_RESULT_SUCCESS) {
+        OSFatal("homebrew_rpx_loader: FunctionPatcher_InitLibrary failed");
+    }
+
     DEBUG_FUNCTION_LINE("Patch functions");
     for (uint32_t i = 0; i < rpx_utils_function_replacements_size; i++) {
-        if (!FunctionPatcherPatchFunction(&rpx_utils_function_replacements[i], nullptr)) {
+        bool wasPatched = false;
+        if (FunctionPatcher_AddFunctionPatch(&rpx_utils_function_replacements[i], nullptr, &wasPatched) != FUNCTION_PATCHER_RESULT_SUCCESS || !wasPatched) {
             OSFatal("homebrew_rpx_loader: Failed to patch function");
         }
     }

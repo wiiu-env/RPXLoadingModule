@@ -21,8 +21,9 @@
 WUMS_MODULE_EXPORT_NAME("homebrew_rpx_loader");
 WUMS_USE_WUT_DEVOPTAB();
 
-extern "C" ContentRedirectionApiErrorType CRGetVersion(ContentRedirectionVersion *);
-extern "C" WUHBUtilsApiErrorType WUU_GetVersion(WUHBUtilsVersion *);
+WUMS_DEPENDS_ON(homebrew_content_redirection);
+WUMS_DEPENDS_ON(homebrew_wuhb_utils);
+WUMS_DEPENDS_ON(homebrew_functionpatcher);
 
 WUMS_INITIALIZE() {
     initLogging();
@@ -35,20 +36,12 @@ WUMS_INITIALIZE() {
     DEBUG_FUNCTION_LINE("Patch functions finished");
     gReplacementInfo = {};
 
-    // Call this function to make sure the Content Redirection will be loaded before this module is module.
-    CRGetVersion(nullptr);
-
-    // Call this function to make sure the WUHBUtils will be loaded before this module is module.
-    WUU_GetVersion(nullptr);
-
-    // But then use libcontentredirection instead.
     ContentRedirectionStatus error;
     if ((error = ContentRedirection_InitLibrary()) != CONTENT_REDIRECTION_RESULT_SUCCESS) {
         DEBUG_FUNCTION_LINE_ERR("Failed to init ContentRedirection. Error %d", error);
         OSFatal("Failed to init ContentRedirection.");
     }
 
-    // But then use libwuhbutils instead.
     WUHBUtilsStatus error2;
     if ((error2 = WUHBUtils_InitLibrary()) != WUHB_UTILS_RESULT_SUCCESS) {
         DEBUG_FUNCTION_LINE_ERR("Failed to init WUHBUtils. Error %d", error2);

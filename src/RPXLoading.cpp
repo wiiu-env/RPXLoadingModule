@@ -381,10 +381,21 @@ RPXLoaderStatus RL_GetVersion(RPXLoaderVersion *outVersion) {
     if (!outVersion) {
         return RPX_LOADER_RESULT_INVALID_ARGUMENT;
     }
-    *outVersion = 1;
+    *outVersion = 2;
     return RPX_LOADER_RESULT_SUCCESS;
 }
 
+RPXLoaderStatus RL_GetPathOfRunningExecutable(char *outBuffer, uint32_t outSize) {
+    if (outBuffer == nullptr || outSize == 0) {
+        return RPX_LOADER_RESULT_INVALID_ARGUMENT;
+    }
+    if (strlen(gReplacementInfo.lastFileLoaded) > 0) {
+        strncpy(outBuffer, gReplacementInfo.lastFileLoaded, outSize - 1);
+        return RPX_LOADER_RESULT_SUCCESS;
+    }
+
+    return RPX_LOADER_RESULT_NOT_AVAILABLE;
+}
 
 WUMS_EXPORT_FUNCTION(RL_PrepareLaunchFromSD);
 WUMS_EXPORT_FUNCTION(RL_LaunchPreparedHomebrew);
@@ -394,3 +405,4 @@ WUMS_EXPORT_FUNCTION(RL_GetVersion);
 WUMS_EXPORT_FUNCTION(RL_EnableContentRedirection);
 WUMS_EXPORT_FUNCTION(RL_DisableContentRedirection);
 WUMS_EXPORT_FUNCTION(RL_UnmountCurrentRunningBundle);
+WUMS_EXPORT_FUNCTION(RL_GetPathOfRunningExecutable);

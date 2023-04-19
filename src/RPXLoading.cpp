@@ -38,8 +38,9 @@ DECL_FUNCTION(int32_t, HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, uint32_t titleid_u
         snprintf(metaxml->shortname_en, sizeof(metaxml->shortname_en), "%s", gReplacementInfo.rpxReplacementInfo.metaInformation.shortname);
         snprintf(metaxml->publisher_en, sizeof(metaxml->publisher_en), "%s", gReplacementInfo.rpxReplacementInfo.metaInformation.author);
 
-        // Disbale the emanual
-        metaxml->e_manual = 0;
+        // Disable the emanual
+        metaxml->e_manual    = 0;
+        metaxml->closing_msg = 0;
 
         return 0;
     }

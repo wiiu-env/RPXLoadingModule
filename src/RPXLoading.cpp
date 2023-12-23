@@ -13,6 +13,7 @@
 #include <mocha/mocha.h>
 #include <mutex>
 #include <nn/acp/title.h>
+#include <nn/save.h>
 #include <romfs_dev.h>
 #include <rpxloader/rpxloader.h>
 #include <string>
@@ -107,6 +108,42 @@ DECL_FUNCTION(void, _SYSLaunchTitleWithStdArgsInNoSplash, uint64_t titleId, void
     real__SYSLaunchTitleWithStdArgsInNoSplash(titleId, u1);
 }
 
+DECL_FUNCTION(SAVEStatus, SAVEInitSaveDir, uint8_t slotNo) {
+    if (saveLayerHandle != 0) {
+        return SAVE_STATUS_OK;
+    }
+    return real_SAVEInitSaveDir(slotNo);
+}
+
+DECL_FUNCTION(SAVEStatus, SAVEInitCommonSaveDir) {
+    if (saveLayerHandle != 0) {
+        return SAVE_STATUS_OK;
+    }
+    return real_SAVEInitCommonSaveDir();
+}
+
+DECL_FUNCTION(SAVEStatus, SAVEInitAccountSaveDir, uint8_t slotNo) {
+    if (saveLayerHandle != 0) {
+        return SAVE_STATUS_OK;
+    }
+    return real_SAVEInitAccountSaveDir(slotNo);
+}
+
+
+DECL_FUNCTION(SAVEStatus, SAVEInitNoDeleteGroupSaveDir) {
+    if (saveLayerHandle != 0) {
+        return SAVE_STATUS_OK;
+    }
+    return real_SAVEInitNoDeleteGroupSaveDir();
+}
+
+DECL_FUNCTION(SAVEStatus, SAVEUpdateSaveDir) {
+    if (saveLayerHandle != 0) {
+        return SAVE_STATUS_OK;
+    }
+    return real_SAVEUpdateSaveDir();
+}
+
 function_replacement_data_t rpx_utils_function_replacements[] = {
         REPLACE_FUNCTION_VIA_ADDRESS_FOR_PROCESS(HBM_NN_ACP_ACPGetTitleMetaXmlByDevice, 0x2E36CE44, 0x0E36CE44, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSOpenFile, LIBRARY_COREINIT, FSOpenFile, FP_TARGET_PROCESS_HOME_MENU),
@@ -114,6 +151,12 @@ function_replacement_data_t rpx_utils_function_replacements[] = {
         REPLACE_FUNCTION_FOR_PROCESS(RPX_FSCloseFile, LIBRARY_COREINIT, FSCloseFile, FP_TARGET_PROCESS_HOME_MENU),
         REPLACE_FUNCTION(OSRestartGame, LIBRARY_COREINIT, OSRestartGame),
         REPLACE_FUNCTION(_SYSLaunchTitleWithStdArgsInNoSplash, LIBRARY_SYSAPP, _SYSLaunchTitleWithStdArgsInNoSplash),
+
+        REPLACE_FUNCTION(SAVEInitSaveDir, LIBRARY_NN_SAVE, SAVEInitSaveDir),
+        REPLACE_FUNCTION(SAVEInitCommonSaveDir, LIBRARY_NN_SAVE, SAVEInitCommonSaveDir),
+        REPLACE_FUNCTION(SAVEInitAccountSaveDir, LIBRARY_NN_SAVE, SAVEInitAccountSaveDir),
+        REPLACE_FUNCTION(SAVEInitNoDeleteGroupSaveDir, LIBRARY_NN_SAVE, SAVEInitNoDeleteGroupSaveDir),
+        REPLACE_FUNCTION(SAVEUpdateSaveDir, LIBRARY_NN_SAVE, SAVEUpdateSaveDir),
 };
 
 uint32_t rpx_utils_function_replacements_size = sizeof(rpx_utils_function_replacements) / sizeof(function_replacement_data_t);

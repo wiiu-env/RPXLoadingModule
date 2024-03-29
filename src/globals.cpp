@@ -1,5 +1,5 @@
 #include "globals.h"
 
-RPXLoader_ReplacementInformation gReplacementInfo __attribute__((section(".data")));
-CRLayerHandle contentLayerHandle __attribute__((section(".data"))) = 0;
-CRLayerHandle saveLayerHandle __attribute__((section(".data")))    = 0;
+RPXLoader_ReplacementInformation gReplacementInfo = {};
+CRLayerHandle contentLayerHandle                  = 0;
+CRLayerHandle saveLayerHandle                     = 0;

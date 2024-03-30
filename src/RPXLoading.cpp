@@ -382,7 +382,7 @@ RPXLoaderStatus RL_GetVersion(RPXLoaderVersion *outVersion) {
     if (!outVersion) {
         return RPX_LOADER_RESULT_INVALID_ARGUMENT;
     }
-    *outVersion = 2;
+    *outVersion = 3;
     return RPX_LOADER_RESULT_SUCCESS;
 }
 
@@ -398,6 +398,18 @@ RPXLoaderStatus RL_GetPathOfRunningExecutable(char *outBuffer, uint32_t outSize)
     return RPX_LOADER_RESULT_NOT_AVAILABLE;
 }
 
+RPXLoaderStatus RL_GetPathOfSaveRedirection(char *outBuffer, uint32_t outSize) {
+    if (outBuffer == nullptr || outSize == 0) {
+        return RPX_LOADER_RESULT_INVALID_ARGUMENT;
+    }
+    if (saveLayerHandle != 0 && !gActiveSaveRedirectionPath.empty()) {
+        strncpy(outBuffer, gActiveSaveRedirectionPath.c_str(), outSize - 1);
+        return RPX_LOADER_RESULT_SUCCESS;
+    }
+
+    return RPX_LOADER_RESULT_NOT_AVAILABLE;
+}
+
 WUMS_EXPORT_FUNCTION(RL_PrepareLaunchFromSD);
 WUMS_EXPORT_FUNCTION(RL_LaunchPreparedHomebrew);
 WUMS_EXPORT_FUNCTION(RL_LaunchHomebrew);
@@ -407,3 +419,4 @@ WUMS_EXPORT_FUNCTION(RL_EnableContentRedirection);
 WUMS_EXPORT_FUNCTION(RL_DisableContentRedirection);
 WUMS_EXPORT_FUNCTION(RL_UnmountCurrentRunningBundle);
 WUMS_EXPORT_FUNCTION(RL_GetPathOfRunningExecutable);
+WUMS_EXPORT_FUNCTION(RL_GetPathOfSaveRedirection);

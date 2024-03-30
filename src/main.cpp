@@ -91,6 +91,8 @@ WUMS_APPLICATION_STARTS() {
         gReplacementInfo.lastFileLoaded[0] = '\0';
     }
 
+    gActiveSaveRedirectionPath.clear();
+
     if (_SYSGetSystemApplicationTitleId(SYSTEM_APP_ID_HEALTH_AND_SAFETY) == OSGetTitleID() &&
         strlen(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath) > 0) {
         uint32_t currentHash           = StringTools::hash(gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath);
@@ -100,10 +102,11 @@ WUMS_APPLICATION_STARTS() {
         nn::act::PersistentId persistentId = nn::act::GetPersistentId();
         nn::act::Finalize();
 
-        std::string basePath = string_format("fs:/vol/external01/wiiu/apps/save/%08X", currentHash);
+        std::string relativePath = string_format("wiiu/apps/save/%08X", currentHash);
         if (!shortNameSanitized.empty()) {
-            basePath += string_format(" (%s)", shortNameSanitized.c_str());
+            relativePath += string_format(" (%s)", shortNameSanitized.c_str());
         }
+        std::string basePath = "fs:/vol/external01/" + relativePath;
 
         std::string common = basePath + "/common";
         std::string user   = basePath + string_format("/%08X", 0x80000000 | persistentId);
@@ -144,6 +147,8 @@ WUMS_APPLICATION_STARTS() {
                     DEBUG_FUNCTION_LINE_VERBOSE("Mounted %s to /vol/content", gReplacementInfo.contentReplacementInfo.bundleMountInformation.mountedPath);
                     gReplacementInfo.contentReplacementInfo.bundleMountInformation.isMounted      = true;
                     gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath[0] = '\0';
+
+                    gActiveSaveRedirectionPath = relativePath;
 
                     OSMemoryBarrier();
                     return;

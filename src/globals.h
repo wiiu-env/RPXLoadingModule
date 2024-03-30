@@ -54,3 +54,4 @@ extern RPXLoader_ReplacementInformation gReplacementInfo;
 
 extern CRLayerHandle contentLayerHandle;
 extern CRLayerHandle saveLayerHandle;
+extern std::string gActiveSaveRedirectionPath;

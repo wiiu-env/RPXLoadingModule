@@ -16,6 +16,7 @@
 #include <romfs_dev.h>
 #include <rpxloader/rpxloader.h>
 #include <string>
+#include <sys/dirent.h>
 #include <sysapp/title.h>
 #include <wuhb_utils/utils.h>
 
@@ -138,6 +139,60 @@ static int parseINIhandler(void *user, const char *section, const char *name,
     return 1;
 }
 
+int32_t getRPXInfoForPath(const std::string &bundle_path) {
+    std::string completePath = std::string("/vol/external01/") + bundle_path;
+    if (romfsMount("rcc", completePath.c_str(), RomfsSource_FileDescriptor_CafeOS) < 0) {
+        DEBUG_FUNCTION_LINE_ERR("Failed to mount %s", completePath.c_str());
+        return -1;
+    }
+    DIR *dir;
+    struct dirent *entry;
+
+    if (!(dir = opendir("rcc:/content/rpl"))) {
+        DEBUG_FUNCTION_LINE_ERR("Failed to open \"rcc:/content/rpl\"");
+        romfsUnmount("rcc");
+        return -2;
+    }
+    bool found = false;
+    int res    = -3;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (std::string(entry->d_name).ends_with(".rpl")) {
+            romfs_fileInfo info = {};
+            if (romfsGetFileInfoPerPath("rcc", (std::string("content/rpl/") + entry->d_name).c_str(), &info) >= 0) {
+                MochaRPLLoadInfo loadInfo = {};
+                strncpy(loadInfo.replaceTarget, entry->d_name, sizeof(loadInfo.replaceTarget) - 1);
+                strncpy(loadInfo.path, bundle_path.c_str(), sizeof(loadInfo.path) - 1);
+                loadInfo.filesize   = (uint32_t) info.length;
+                loadInfo.fileoffset = (uint32_t) info.offset;
+
+                loadInfo.target = LOAD_RPX_TARGET_SD_CARD;
+
+                DEBUG_FUNCTION_LINE_ERR("filesize: %08X fileoffset: %08X", loadInfo.filesize, loadInfo.fileoffset);
+
+                if (Mocha_PrepareRPLLaunch(&loadInfo) == MOCHA_RESULT_SUCCESS) {
+                    DEBUG_FUNCTION_LINE_ERR("Success rpl load!");
+                } else {
+                    DEBUG_FUNCTION_LINE_ERR("rpl load failed!");
+                }
+
+                res = 0;
+            } else {
+                DEBUG_FUNCTION_LINE_ERR("Fail to get info for path");
+            }
+        }
+    }
+
+    closedir(dir);
+
+    romfsUnmount("rcc");
+
+    if (!found) {
+        return -4;
+    }
+    return res;
+}
+
+
 RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
     MochaRPXLoadInfo request;
     memset(&request, 0, sizeof(request));
@@ -242,6 +297,11 @@ RPXLoaderStatus RL_PrepareLaunchFromSD(const char *bundle_path) {
     }
 
     DEBUG_FUNCTION_LINE("Launch %s on next restart [size: %08X offset: %08X]", request.path, request.filesize, request.fileoffset);
+
+    if (success && isBundle) {
+        DEBUG_FUNCTION_LINE_ERR("Try to load RPL info");
+        getRPXInfoForPath(bundle_path);
+    }
 
     gReplacementInfo.contentReplacementInfo.bundleMountInformation.toMountPath[0] = '\0';
     if (isBundle) {
